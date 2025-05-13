@@ -7,6 +7,9 @@
   let userItems = $state([] as any[]);
   let activeTab = $state('all'); // 'all', 'lost', 'found'
 
+  // Success messages
+  let showDeletedMessage = $state(false);
+
   onMount(() => {
     // Subscribe to auth store
     const unsubscribe = authStore.subscribe((value) => {
@@ -26,6 +29,21 @@
         isLoading = false;
       }
     });
+
+    // Check URL parameters for success messages
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('deleted')) {
+      showDeletedMessage = true;
+
+      // Auto-hide the message after 5 seconds
+      setTimeout(() => {
+        showDeletedMessage = false;
+      }, 5000);
+
+      // Remove the parameter from URL without refreshing
+      url.searchParams.delete('deleted');
+      window.history.replaceState({}, '', url.toString());
+    }
 
     return unsubscribe;
   });
@@ -86,9 +104,49 @@
       ? userItems
       : userItems.filter(item => item.status === activeTab)
   );
+
+  // Delete item function
+  async function deleteItem(itemId: number) {
+    try {
+      const response = await fetch(`/api/items/${itemId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete item');
+      }
+
+      // Show success message
+      showDeletedMessage = true;
+
+      // Auto-hide the message after 5 seconds
+      setTimeout(() => {
+        showDeletedMessage = false;
+      }, 5000);
+
+      // Remove the item from the list
+      userItems = userItems.filter(item => item.id !== itemId);
+
+    } catch (err) {
+      console.error('Error deleting item:', err);
+      alert('Failed to delete item: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
+  }
 </script>
 
 <div class="my-items-container">
+  {#if showDeletedMessage}
+    <div class="success-message">
+      <span class="material-icons">check_circle</span>
+      Item successfully deleted.
+    </div>
+  {/if}
+
   <div class="my-items-header">
     <h1>My Items</h1>
     <a href="/account/report" class="report-button">
@@ -190,6 +248,22 @@
               <a href={`/account/items/${item.id}`} class="view-button">
                 View Details
               </a>
+              <div class="action-buttons">
+                <a href={`/account/items/${item.id}/edit`} class="action-button edit-button" title="Edit Item">
+                  <span class="material-icons">edit</span>
+                </a>
+                <button
+                  onclick={() => {
+                    if (confirm('Are you sure you want to delete this item?')) {
+                      deleteItem(item.id);
+                    }
+                  }}
+                  class="action-button delete-button"
+                  title="Delete Item"
+                >
+                  <span class="material-icons">delete</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -201,6 +275,21 @@
 <style>
   .my-items-container {
     max-width: 100%;
+  }
+
+  .success-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #d1e7dd;
+    color: #0f5132;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+  }
+
+  .success-message .material-icons {
+    color: #0f5132;
   }
 
   .my-items-header {
@@ -400,6 +489,14 @@
 
   .item-actions {
     margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
   }
 
   .view-button {
@@ -415,5 +512,35 @@
 
   .view-button:hover {
     background-color: #e5d29d;
+  }
+
+  .action-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .edit-button {
+    background-color: #EFDCAB;
+    color: #443627;
+  }
+
+  .edit-button:hover {
+    background-color: #e5d29d;
+  }
+
+  .delete-button {
+    background-color: #f8d7da;
+    color: #842029;
+  }
+
+  .delete-button:hover {
+    background-color: #f5c2c7;
   }
 </style>

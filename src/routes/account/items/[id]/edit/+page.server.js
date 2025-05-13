@@ -1,4 +1,4 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 import { getItemById } from '$lib/sqliteDb';
 
 export async function load({ params, cookies }) {
@@ -17,7 +17,7 @@ export async function load({ params, cookies }) {
       throw error(400, 'Invalid item ID format');
     }
 
-    console.log(`Loading item with ID ${numericId} for details page`);
+    console.log(`Loading item with ID ${numericId} for edit page`);
 
     // Get the item details
     const item = getItemById(numericId);
@@ -37,15 +37,24 @@ export async function load({ params, cookies }) {
       try {
         const userData = JSON.parse(userCookie);
         userId = userData.id;
+        console.log(`User ID from cookie: ${userId}`);
       } catch (e) {
         console.error('Error parsing user cookie:', e);
       }
+    } else {
+      console.error('No user cookie found');
     }
 
     // Check if this item belongs to the current user
-    if (userId && item.user_id && parseInt(userId, 10) !== parseInt(item.user_id, 10)) {
-      console.error(`User ${userId} does not have permission to view item ${numericId} (owned by ${item.user_id})`);
-      throw error(403, 'You do not have permission to view this item');
+    if (!userId) {
+      console.error('No user ID found, redirecting to login');
+      throw redirect(302, '/login');
+    }
+
+    // Check if user has permission to edit this item
+    if (item.user_id && userId && parseInt(item.user_id) !== parseInt(userId)) {
+      console.error(`User ${userId} does not have permission to edit item ${numericId} (owned by ${item.user_id})`);
+      throw error(403, 'You do not have permission to edit this item');
     }
 
     return {
@@ -57,7 +66,7 @@ export async function load({ params, cookies }) {
       }
     };
   } catch (err) {
-    console.error('Error loading item:', err);
+    console.error('Error loading item for edit:', err);
     throw error(500, `Failed to load item details: ${err.message}`);
   }
 }

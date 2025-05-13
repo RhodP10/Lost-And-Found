@@ -16,11 +16,29 @@
     item.formatted_date = new Date(item.date_reported).toLocaleDateString();
   }
 
+  // Success messages
+  let showUpdatedMessage = $state(false);
+
   onMount(() => {
     // Subscribe to auth store
     const unsubscribe = authStore.subscribe((value) => {
       user = value;
     });
+
+    // Check URL parameters for success messages
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('updated')) {
+      showUpdatedMessage = true;
+
+      // Auto-hide the message after 5 seconds
+      setTimeout(() => {
+        showUpdatedMessage = false;
+      }, 5000);
+
+      // Remove the parameter from URL without refreshing
+      url.searchParams.delete('updated');
+      window.history.replaceState({}, '', url.toString());
+    }
 
     return unsubscribe;
   });
@@ -28,15 +46,109 @@
   function goBack() {
     goto('/account/items');
   }
+
+  // Delete confirmation
+  let showDeleteConfirm = $state(false);
+  let isDeleting = $state(false);
+  let deleteError = $state('');
+
+  async function deleteItemHandler() {
+    if (!item || !item.id) return;
+
+    try {
+      isDeleting = true;
+      deleteError = '';
+
+      const response = await fetch(`/api/items/${item.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete item');
+      }
+
+      // Redirect back to items list
+      goto('/account/items?deleted=true');
+
+    } catch (err) {
+      deleteError = err instanceof Error ? err.message : 'An error occurred';
+      console.error('Error deleting item:', deleteError);
+    } finally {
+      isDeleting = false;
+    }
+  }
+
+  function editItem() {
+    goto(`/account/items/${item.id}/edit`);
+  }
 </script>
 
 <div class="item-details-container">
   <div class="back-button-container">
-    <button onclick={goBack} class="back-button">
-      <span class="material-icons">arrow_back</span>
-      Back to My Items
-    </button>
+    <div class="actions-row">
+      <button onclick={goBack} class="back-button">
+        <span class="material-icons">arrow_back</span>
+        Back to My Items
+      </button>
+
+      <div class="action-buttons">
+        <button onclick={editItem} class="btn btn-edit" title="Edit Item">
+          <span class="material-icons">edit</span>
+          Edit
+        </button>
+        <button onclick={() => showDeleteConfirm = true} class="btn btn-delete" title="Delete Item">
+          <span class="material-icons">delete</span>
+          Delete
+        </button>
+      </div>
+    </div>
   </div>
+
+  <!-- Success message for update -->
+  {#if showUpdatedMessage}
+    <div class="success-message">
+      <span class="material-icons">check_circle</span>
+      Item successfully updated.
+    </div>
+  {/if}
+
+  <!-- Delete confirmation modal -->
+  {#if showDeleteConfirm}
+    <div class="modal-overlay">
+      <div class="modal-content">
+        <h3>Delete Item</h3>
+        <p>Are you sure you want to delete this item? This action cannot be undone.</p>
+
+        {#if deleteError}
+          <div class="error-alert">
+            <p>{deleteError}</p>
+          </div>
+        {/if}
+
+        <div class="modal-actions">
+          <button
+            onclick={() => showDeleteConfirm = false}
+            class="btn btn-secondary"
+            disabled={isDeleting}
+          >
+            Cancel
+          </button>
+          <button
+            onclick={deleteItemHandler}
+            class="btn btn-delete"
+            disabled={isDeleting}
+          >
+            {isDeleting ? 'Deleting...' : 'Delete'}
+          </button>
+        </div>
+      </div>
+    </div>
+  {/if}
 
   {#if isLoading}
     <div class="loading">
@@ -156,6 +268,18 @@
     margin-bottom: 1.5rem;
   }
 
+  .actions-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+  }
+
   .back-button {
     display: flex;
     align-items: center;
@@ -175,6 +299,86 @@
     margin-right: 0.5rem;
   }
 
+  .btn-edit {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background-color: #EFDCAB;
+    color: #443627;
+    border: none;
+  }
+
+  .btn-edit:hover {
+    background-color: #e5d29d;
+  }
+
+  .btn-delete {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    background-color: #f8d7da;
+    color: #842029;
+    border: none;
+  }
+
+  .btn-delete:hover {
+    background-color: #f5c2c7;
+  }
+
+  .btn-secondary {
+    background-color: #e9ecef;
+    color: #212529;
+    border: none;
+  }
+
+  .btn-secondary:hover {
+    background-color: #dde2e6;
+  }
+
+  /* Modal styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+
+  .modal-content {
+    background-color: white;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .modal-content h3 {
+    color: #443627;
+    margin-top: 0;
+    margin-bottom: 1rem;
+  }
+
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .error-alert {
+    background-color: #f8d7da;
+    color: #842029;
+    padding: 0.75rem;
+    border-radius: 0.25rem;
+    margin-top: 1rem;
+  }
+
   .loading, .error-message {
     background-color: white;
     border-radius: 0.5rem;
@@ -184,6 +388,21 @@
 
   .error-message {
     color: #842029;
+  }
+
+  .success-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #d1e7dd;
+    color: #0f5132;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+  }
+
+  .success-message .material-icons {
+    color: #0f5132;
   }
 
   .item-details-card {
