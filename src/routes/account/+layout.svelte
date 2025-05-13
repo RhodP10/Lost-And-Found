@@ -148,20 +148,19 @@
 <style>
   .account-layout {
     display: flex;
-    min-height: calc(100vh - 60px); /* Adjust based on your header height */
+    min-height: 100vh; /* Use full viewport height */
   }
 
   .sidebar {
     background-color: #443627;
     color: white;
     width: 250px;
-    height: 100%;
     display: flex;
     flex-direction: column;
     padding: 1.5rem 0;
     position: sticky;
-    top: 60px; /* Adjust based on your header height */
-    height: calc(100vh - 60px); /* Adjust based on your header height */
+    top: 0; /* Position at the top with no gap */
+    height: 100vh; /* Use full viewport height */
   }
 
   .user-profile {
