@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { authStore } from '$lib/stores/auth';
+  import { navigateToAccountPage } from '$lib/utils/navigation';
 
   let user = $state(null as any);
   let isLoading = $state(true);
@@ -114,7 +115,11 @@
                 <td>{item.category}</td>
                 <td>{item.date_reported}</td>
                 <td>
-                  <a href={`/items/${item.id}`} class="view-button">
+                  <a href={`/account/items/${item.id}`} class="view-button" data-from-account="true" onclick={(e) => {
+                    // Ensure we stay in the account layout
+                    e.preventDefault();
+                    navigateToAccountPage(`/items/${item.id}`);
+                  }}>
                     View
                   </a>
                 </td>

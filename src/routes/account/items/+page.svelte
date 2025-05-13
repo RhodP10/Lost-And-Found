@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { authStore } from '$lib/stores/auth';
+  import { navigateToAccountPage } from '$lib/utils/navigation';
 
   let user = $state(null as any);
   let isLoading = $state(true);
@@ -245,11 +246,19 @@
               </div>
             </div>
             <div class="item-actions">
-              <a href={`/account/items/${item.id}`} class="view-button">
+              <a href={`/account/items/${item.id}`} class="view-button" data-from-account="true" onclick={(e) => {
+                // Ensure we stay in the account layout
+                e.preventDefault();
+                navigateToAccountPage(`/items/${item.id}`);
+              }}>
                 View Details
               </a>
               <div class="action-buttons">
-                <a href={`/account/items/${item.id}/edit`} class="action-button edit-button" title="Edit Item">
+                <a href={`/account/items/${item.id}/edit`} class="action-button edit-button" title="Edit Item" onclick={(e) => {
+                  // Ensure we stay in the account layout
+                  e.preventDefault();
+                  navigateToAccountPage(`/items/${item.id}/edit`);
+                }}>
                   <span class="material-icons">edit</span>
                 </a>
                 <button

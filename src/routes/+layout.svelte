@@ -10,7 +10,24 @@
 
 	// Check if current page is login, signup, or account page
 	let isAuthPage = $derived(currentPath === '/login' || currentPath === '/signup');
-	let isAccountPage = $derived(currentPath.startsWith('/account'));
+
+	// Determine if we're on an account page
+	function checkIfAccountPage(path: string) {
+		// Any path that starts with /account should use the account layout
+		return path.startsWith('/account');
+	}
+
+	let isAccountPage = $derived(checkIfAccountPage(currentPath));
+
+	// Force account layout for specific paths
+	$effect(() => {
+		console.log('Current path:', currentPath, 'isAccountPage:', isAccountPage);
+
+		// Log when we're on an account page
+		if (isAccountPage) {
+			console.log('Using account layout for path:', currentPath);
+		}
+	});
 
 	// Subscribe to auth store
 	onMount(() => {
@@ -38,7 +55,16 @@
 
 	// Update currentPath when the URL changes
 	function updatePath() {
-		currentPath = window.location.pathname;
+		const newPath = window.location.pathname;
+		console.log('Path changed from', currentPath, 'to', newPath);
+		currentPath = newPath;
+
+		// Log the layout decision for debugging
+		console.log('Layout decision:',
+			isAuthPage ? 'Auth Page' :
+			isAccountPage ? 'Account Page' :
+			'Regular Page'
+		);
 	}
 
 	onMount(() => {

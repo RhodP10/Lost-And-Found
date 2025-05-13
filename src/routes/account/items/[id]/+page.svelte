@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
   import { authStore } from '$lib/stores/auth';
+  import { navigateToAccountPage } from '$lib/utils/navigation';
 
   // Get the data from the server-side load function
   let { data } = $props<{ data: { item: any } }>();
@@ -44,7 +44,8 @@
   });
 
   function goBack() {
-    goto('/account/items');
+    // Use our navigation utility to ensure we stay in the account layout
+    navigateToAccountPage('/items');
   }
 
   // Delete confirmation
@@ -72,8 +73,8 @@
         throw new Error(errorData.error || 'Failed to delete item');
       }
 
-      // Redirect back to items list
-      goto('/account/items?deleted=true');
+      // Redirect back to items list using our navigation utility
+      navigateToAccountPage('/items?deleted=true');
 
     } catch (err) {
       deleteError = err instanceof Error ? err.message : 'An error occurred';
@@ -84,7 +85,8 @@
   }
 
   function editItem() {
-    goto(`/account/items/${item.id}/edit`);
+    // Use our navigation utility to ensure we stay in the account layout
+    navigateToAccountPage(`/items/${item.id}/edit`);
   }
 </script>
 
@@ -116,6 +118,12 @@
       Item successfully updated.
     </div>
   {/if}
+
+  <!-- Owner message -->
+  <div class="owner-message">
+    <span class="material-icons">person</span>
+    You are viewing your own item. You can edit or delete it using the buttons above.
+  </div>
 
   <!-- Delete confirmation modal -->
   {#if showDeleteConfirm}
@@ -166,7 +174,7 @@
       <div class="item-header">
         <div class="item-title-section">
           <div class="item-status" class:lost={item.status === 'lost'} class:found={item.status === 'found'}>
-            {item.status}
+            {item.status.toUpperCase()}
           </div>
           <h1 class="item-title">{item.title}</h1>
         </div>
@@ -195,32 +203,35 @@
                 <span class="info-label">Category</span>
                 <span class="info-value">{item.category}</span>
               </div>
-              {#if item.description}
-                <div class="info-item full-width">
-                  <span class="info-label">Description</span>
-                  <p class="info-value description">{item.description}</p>
-                </div>
-              {/if}
             </div>
+
+            {#if item.description}
+              <div class="description-section">
+                <h3>Description</h3>
+                <p>{item.description}</p>
+              </div>
+            {/if}
           </div>
 
           <div class="info-section">
             <h2>Location Information</h2>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">Location</span>
-                <span class="info-value">{item.location || 'Not specified'}</span>
-              </div>
-              {#if item.floor}
-                <div class="info-item">
-                  <span class="info-label">Floor</span>
-                  <span class="info-value">{item.floor}</span>
+            <div class="location-grid">
+              <div class="location-row">
+                <div class="location-item">
+                  <h3>Location</h3>
+                  <p>{item.location || 'Not specified'}</p>
                 </div>
-              {/if}
+                <div class="location-item">
+                  <h3>Floor</h3>
+                  <p>{item.floor || 'Not specified'}</p>
+                </div>
+              </div>
               {#if item.room_number}
-                <div class="info-item">
-                  <span class="info-label">Room</span>
-                  <span class="info-value">{item.room_number}</span>
+                <div class="location-row">
+                  <div class="location-item">
+                    <h3>Room Number</h3>
+                    <p>{item.room_number}</p>
+                  </div>
                 </div>
               {/if}
             </div>
@@ -228,22 +239,7 @@
 
           <div class="info-section">
             <h2>Contact Information</h2>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">Name</span>
-                <span class="info-value">{item.reporter_name}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Email</span>
-                <span class="info-value">{item.reporter_email}</span>
-              </div>
-              {#if item.reporter_phone}
-                <div class="info-item">
-                  <span class="info-label">Phone</span>
-                  <span class="info-value">{item.reporter_phone}</span>
-                </div>
-              {/if}
-            </div>
+            <p class="contact-hidden">Contact information is hidden to protect privacy.</p>
           </div>
         </div>
       </div>
@@ -405,6 +401,23 @@
     color: #0f5132;
   }
 
+  .owner-message {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background-color: #e2e3e5;
+    color: #41464b;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+    font-size: 0.875rem;
+  }
+
+  .owner-message .material-icons {
+    color: #41464b;
+    font-size: 1.25rem;
+  }
+
   .item-details-card {
     background-color: white;
     border-radius: 0.5rem;
@@ -538,10 +551,6 @@
     flex-direction: column;
   }
 
-  .info-item.full-width {
-    grid-column: 1 / -1;
-  }
-
   .info-label {
     font-weight: 500;
     color: #6c757d;
@@ -553,8 +562,46 @@
     color: #212529;
   }
 
-  .description {
+  .description-section {
+    margin-top: 1rem;
+  }
+
+  .description-section h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: #443627;
+  }
+
+  .description-section p {
     white-space: pre-line;
+    color: #212529;
+  }
+
+  .location-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .location-row {
+    display: flex;
+    gap: 2rem;
+  }
+
+  .location-item h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: #443627;
+  }
+
+  .location-item p {
+    color: #212529;
+  }
+
+  .contact-hidden {
+    color: #6c757d;
+    font-style: italic;
+    margin-top: 0.5rem;
   }
 
   .btn {

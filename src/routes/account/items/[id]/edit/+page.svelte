@@ -212,8 +212,9 @@
         success = true;
 
         // Redirect to item details after a short delay
+        // Use keepFocus to ensure we stay in the account layout
         setTimeout(() => {
-          goto(`/account/items/${itemId}?updated=true`);
+          goto(`/account/items/${itemId}?updated=true`, { keepFocus: true });
         }, 1500);
       } catch (fetchError) {
         console.error('Fetch error:', fetchError);
@@ -229,10 +230,11 @@
 
   function goBack() {
     // Use the parsed itemId if available, otherwise go to the items list
+    // Use keepFocus to ensure we stay in the account layout
     if (itemId) {
-      goto(`/account/items/${itemId}`);
+      goto(`/account/items/${itemId}`, { keepFocus: true });
     } else {
-      goto('/account/items');
+      goto('/account/items', { keepFocus: true });
     }
   }
 </script>

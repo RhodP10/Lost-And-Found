@@ -51,7 +51,14 @@
     } else if (path.includes('/profile')) {
       pageTitle = 'Profile';
     } else if (path.includes('/items')) {
-      pageTitle = 'My Items';
+      // Check if it's an item details page
+      if (path.match(/\/items\/\d+$/)) {
+        pageTitle = 'Item Details';
+      } else if (path.includes('/edit')) {
+        pageTitle = 'Edit Item';
+      } else {
+        pageTitle = 'My Items';
+      }
     } else {
       pageTitle = 'Account';
     }

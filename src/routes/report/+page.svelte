@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import type { Category } from '$lib/types';
 	import { authStore } from '$lib/stores/auth';
+	import { navigateToAccountPage, isAccountPage } from '$lib/utils/navigation';
 	// Accept initialStatus prop from parent component
 	let { initialStatus = 'lost' } = $props<{ initialStatus?: 'lost' | 'found' }>();
 
@@ -37,6 +38,10 @@
 		if (typeParam === 'found') {
 			status = 'found';
 		}
+
+		// Log whether we're in the account section for debugging
+		console.log('Current path:', window.location.pathname);
+		console.log('Is account page:', isAccountPage());
 	});
 
 	// Floor options
@@ -236,12 +241,13 @@
 			// Redirect to the appropriate page after a short delay
 			setTimeout(() => {
 				// Check if we're in the account section
-				const isAccountPage = window.location.pathname.startsWith('/account');
-				if (isAccountPage) {
-					// Redirect to account items page
-					goto('/account/items');
+				if (isAccountPage()) {
+					// Redirect to account items page using our navigation utility
+					console.log('Redirecting to account items page');
+					navigateToAccountPage('/items');
 				} else {
 					// Redirect to item details page
+					console.log('Redirecting to public item details page');
 					goto(`/items/${result.id}`);
 				}
 			}, 2000);
