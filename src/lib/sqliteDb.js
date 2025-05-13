@@ -349,6 +349,60 @@ export function getCategories() {
   return db.prepare('SELECT * FROM categories ORDER BY name').all();
 }
 
+// Update user information
+export async function updateUser(userId, userData) {
+  // Check if user exists
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Build SQL query dynamically based on what's being updated
+  let sql = 'UPDATE users SET ';
+  const params = [];
+  const setClauses = [];
+
+  // Add fields to update
+  if (userData.email !== undefined) {
+    setClauses.push('email = ?');
+    params.push(userData.email);
+  }
+
+  if (userData.username !== undefined) {
+    setClauses.push('username = ?');
+    params.push(userData.username);
+  }
+
+  if (userData.full_name !== undefined) {
+    setClauses.push('full_name = ?');
+    params.push(userData.full_name);
+  }
+
+  if (userData.password !== undefined) {
+    setClauses.push('password = ?');
+    params.push(userData.password);
+  }
+
+  // Always update the updated_at timestamp
+  setClauses.push('updated_at = CURRENT_TIMESTAMP');
+
+  sql += setClauses.join(', ');
+  sql += ' WHERE id = ?';
+  params.push(userId);
+
+  // Execute the update
+  const stmt = db.prepare(sql);
+  const result = stmt.run(...params);
+
+  if (result.changes === 0) {
+    return null;
+  }
+
+  // Get the updated user (without password)
+  const updatedUser = db.prepare('SELECT id, email, username, full_name, created_at, updated_at FROM users WHERE id = ?').get(userId);
+  return updatedUser;
+}
+
 export default {
   db, // Export the database object for debugging
   findUserByEmail,
@@ -356,6 +410,7 @@ export default {
   findUserByUsernameOrEmail,
   createUser,
   verifyUser,
+  updateUser,
   getItems,
   getItemById,
   createItem,

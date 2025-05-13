@@ -13,6 +13,7 @@
   let currentPassword = $state('');
   let newPassword = $state('');
   let confirmPassword = $state('');
+  let isLoading = $state(false);
 
   // Form validation
   let errors = $state({} as {
@@ -73,26 +74,87 @@
     if (!validateForm()) return;
 
     try {
-      // In a real app, this would call an API endpoint
-      // For now, we'll just simulate a successful update
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Show loading state
+      isLoading = true;
+      errors = {};
+      success = '';
 
-      // Update user in auth store (simulated)
-      const updatedUser = {
-        ...user,
+      // Prepare the update data
+      const updateData: {
+        email: string;
+        username: string;
+        full_name: string;
+        currentPassword?: string;
+        newPassword?: string;
+      } = {
         email,
         username,
         full_name: fullName
       };
 
-      authStore.login(updatedUser);
+      // Add password data if changing password
+      if (newPassword) {
+        updateData.currentPassword = currentPassword;
+        updateData.newPassword = newPassword;
+      }
+
+      console.log('Sending profile update request');
+
+      // Call the API endpoint
+      const response = await fetch('/api/user/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData),
+        credentials: 'include' // Include cookies in the request
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Handle specific error messages
+        if (data.error === 'Email already in use') {
+          errors.email = 'This email is already in use by another account';
+        } else if (data.error === 'Username already taken') {
+          errors.username = 'This username is already taken by another account';
+        } else if (data.error === 'Current password is incorrect') {
+          errors.currentPassword = 'Current password is incorrect';
+        } else {
+          errors.general = data.error || 'Failed to update profile. Please try again.';
+        }
+        throw new Error(data.error || 'Failed to update profile');
+      }
+
+      // Update user in auth store with the returned user data
+      if (data.user) {
+        authStore.login(data.user);
+      } else {
+        // Fallback if the API doesn't return the updated user
+        const updatedUser = {
+          ...user,
+          email,
+          username,
+          full_name: fullName
+        };
+        authStore.login(updatedUser);
+      }
 
       success = 'Profile updated successfully!';
       isEditing = false;
 
+      // Reset password fields
+      currentPassword = '';
+      newPassword = '';
+      confirmPassword = '';
+
     } catch (error) {
       console.error('Error updating profile:', error);
-      errors.general = 'Failed to update profile. Please try again.';
+      if (!Object.keys(errors).length) {
+        errors.general = 'Failed to update profile. Please try again.';
+      }
+    } finally {
+      isLoading = false;
     }
   }
 </script>
@@ -208,11 +270,11 @@
         </div>
 
         <div class="form-actions">
-          <button type="button" onclick={toggleEditMode} class="cancel-button">
+          <button type="button" onclick={toggleEditMode} class="cancel-button" disabled={isLoading}>
             Cancel
           </button>
-          <button type="submit" class="save-button">
-            Save Changes
+          <button type="submit" class="save-button" disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </form>
@@ -366,6 +428,16 @@
     border-radius: 0.375rem;
     cursor: pointer;
     font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .cancel-button:hover:not(:disabled) {
+    background-color: #e2e6ea;
+  }
+
+  .cancel-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .save-button {
@@ -376,6 +448,16 @@
     border-radius: 0.375rem;
     cursor: pointer;
     font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .save-button:hover:not(:disabled) {
+    background-color: #c47520;
+  }
+
+  .save-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .profile-info {
