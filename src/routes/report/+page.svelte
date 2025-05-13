@@ -2,28 +2,42 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import type { Category } from '$lib/types';
+	import { authStore } from '$lib/stores/auth';
+	// Accept initialStatus prop from parent component
+	let { initialStatus = 'lost' } = $props<{ initialStatus?: 'lost' | 'found' }>();
 
-	let categories: Category[] = [];
-	let isLoading = false;
-	let error = '';
-	let success = false;
+	let categories = $state<Category[]>([]);
+	let isLoading = $state(false);
+	let error = $state('');
+	let success = $state(false);
+	let user = $state(null as any);
 
 	// Form data
-	let title = '';
-	let description = '';
-	let category = '';
-	let status: 'lost' | 'found' = 'lost';
-	let location = '';
-	let floor = '';
-	let roomNumber = '';
-	let reporterName = '';
-	let reporterEmail = '';
-	let reporterPhone = '';
-	let imageUrl = '';
-	let imageFile: File | null = null;
-	let imagePreview = '';
-	let uploadProgress = 0;
-	let isUploading = false;
+	let title = $state('');
+	let description = $state('');
+	let category = $state('');
+	let status = $state<'lost' | 'found'>(initialStatus);
+	let location = $state('');
+	let floor = $state('');
+	let roomNumber = $state('');
+	let reporterName = $state('');
+	let reporterEmail = $state('');
+	let reporterPhone = $state('');
+	let imageUrl = $state('');
+	let imageFile = $state<File | null>(null);
+	let imagePreview = $state('');
+	let uploadProgress = $state(0);
+	let isUploading = $state(false);
+
+	// Check URL parameters on mount
+	onMount(() => {
+		// Check if URL has type=found parameter
+		const url = new URL(window.location.href);
+		const typeParam = url.searchParams.get('type');
+		if (typeParam === 'found') {
+			status = 'found';
+		}
+	});
 
 	// Floor options
 	const floorOptions = [
@@ -35,9 +49,36 @@
 	];
 
 	// Form validation
-	let errors: Record<string, string> = {};
+	let errors = $state<Record<string, string>>({});
 
-	onMount(async () => {
+	onMount(() => {
+		// Subscribe to auth store to get user information
+		const unsubscribe = authStore.subscribe((value) => {
+			user = value;
+
+			// Pre-fill user information if available
+			if (user) {
+				reporterName = user.username || '';
+				reporterEmail = user.email || '';
+
+				// If user has a full_name, use that instead of username
+				if (user.full_name) {
+					reporterName = user.full_name;
+				}
+
+				// Log user ID for debugging
+				console.log('User ID in report form:', user.id);
+			}
+		});
+
+		// Fetch categories
+		fetchCategories();
+
+		// Return the unsubscribe function
+		return unsubscribe;
+	});
+
+	async function fetchCategories() {
 		try {
 			const response = await fetch('/api/categories');
 			if (!response.ok) throw new Error('Failed to fetch categories');
@@ -46,7 +87,7 @@
 			error = err instanceof Error ? err.message : 'An error occurred';
 			console.error(error);
 		}
-	});
+	}
 
 	function validateForm() {
 		errors = {};
@@ -145,6 +186,10 @@
 				}
 			}
 
+			// Include user_id if user is logged in
+			const userId = user ? user.id : null;
+			console.log('Submitting report with user ID:', userId);
+
 			const itemData = {
 				title,
 				description,
@@ -156,7 +201,8 @@
 				reporter_name: reporterName,
 				reporter_email: reporterEmail,
 				reporter_phone: reporterPhone,
-				image_url: uploadedImageUrl
+				image_url: uploadedImageUrl,
+				user_id: userId
 			};
 
 			const response = await fetch('/api/items', {
@@ -187,9 +233,17 @@
 			imageFile = null;
 			imagePreview = '';
 
-			// Redirect to the item page after a short delay
+			// Redirect to the appropriate page after a short delay
 			setTimeout(() => {
-				goto(`/items/${result.id}`);
+				// Check if we're in the account section
+				const isAccountPage = window.location.pathname.startsWith('/account');
+				if (isAccountPage) {
+					// Redirect to account items page
+					goto('/account/items');
+				} else {
+					// Redirect to item details page
+					goto(`/items/${result.id}`);
+				}
 			}, 2000);
 
 		} catch (err) {
@@ -221,7 +275,7 @@
 
 	<div class="card">
 		<div class="card-body">
-			<form on:submit|preventDefault={handleSubmit}>
+			<form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
 				<div class="grid grid-cols-1 grid-cols-md-2 gap-4 mb-4">
 					<div style="grid-column: span 2;">
 						<div class="flex space-x-4">
@@ -349,7 +403,7 @@
 								type="file"
 								id="image"
 								accept="image/*"
-								on:change={handleImageUpload}
+								onchange={handleImageUpload}
 								class="form-control"
 								style={errors.image ? 'border-color: #ef4444;' : ''}
 							/>

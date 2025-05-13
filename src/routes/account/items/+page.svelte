@@ -11,33 +11,69 @@
     // Subscribe to auth store
     const unsubscribe = authStore.subscribe((value) => {
       user = value;
+
+      // When user changes, fetch items if user is available
+      if (user && user.id) {
+        isLoading = true;
+        fetchUserItems()
+          .catch(error => {
+            console.error('Error fetching user items:', error);
+          })
+          .finally(() => {
+            isLoading = false;
+          });
+      } else {
+        isLoading = false;
+      }
     });
-
-    // Fetch user's items
-    if (user) {
-      fetchUserItems().catch(error => {
-        console.error('Error fetching user items:', error);
-      });
-    }
-
-    isLoading = false;
 
     return unsubscribe;
   });
 
   async function fetchUserItems() {
     try {
-      const response = await fetch('/api/user/items');
+      // Make sure we have a user
+      if (!user || !user.id) {
+        console.error('No user ID available');
+        return;
+      }
+
+      console.log('Fetching items for user ID:', user.id);
+
+      // Get user from localStorage for auth header
+      let authToken = '';
+      try {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+          authToken = storedUser;
+        }
+      } catch (e) {
+        console.error('Error getting user from localStorage:', e);
+      }
+
+      // Fetch items for the current user
+      const response = await fetch('/api/user/items', {
+        headers: {
+          'Content-Type': 'application/json',
+          // Include user data in auth header as a backup
+          'Authorization': `Bearer ${authToken}`
+        },
+        credentials: 'include' // Include cookies in the request
+      });
 
       if (!response.ok) {
         throw new Error('Failed to fetch items');
       }
 
       const data = await response.json();
+
+      // Format the date and update the items
       userItems = data.map((item: any) => ({
         ...item,
         date_reported: new Date(item.date_reported).toLocaleDateString()
       }));
+
+      console.log('Fetched user items:', userItems);
     } catch (error) {
       console.error('Error fetching user items:', error);
       userItems = [];
@@ -55,7 +91,7 @@
 <div class="my-items-container">
   <div class="my-items-header">
     <h1>My Items</h1>
-    <a href="/report" class="report-button">
+    <a href="/account/report" class="report-button">
       <span class="material-icons">add</span>
       Report New Item
     </a>
@@ -102,7 +138,7 @@
       {:else}
         <p>You haven't reported any found items yet.</p>
       {/if}
-      <a href="/report" class="empty-action">Report an Item</a>
+      <a href="/account/report" class="empty-action">Report an Item</a>
     </div>
   {:else}
     <div class="items-grid">
@@ -151,7 +187,7 @@
               </div>
             </div>
             <div class="item-actions">
-              <a href={`/items/${item.id}`} class="view-button">
+              <a href={`/account/items/${item.id}`} class="view-button">
                 View Details
               </a>
             </div>

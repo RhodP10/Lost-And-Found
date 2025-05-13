@@ -19,7 +19,7 @@
   const navItems = [
     { path: '/account/dashboard', label: 'Dashboard', icon: 'dashboard' },
     { path: '/account/profile', label: 'Profile', icon: 'person' },
-    { path: '/report', label: 'Report Item', icon: 'add_circle' },
+    { path: '/account/report', label: 'Report Item', icon: 'add_circle' },
     { path: '/account/items', label: 'My Items', icon: 'inventory' }
   ];
 

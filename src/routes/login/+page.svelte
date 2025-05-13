@@ -51,8 +51,8 @@
 			// Store user info in the auth store
 			authStore.login(data.user);
 
-			// Redirect to dashboard
-			goto('/dashboard', { replaceState: true });
+			// Redirect to account dashboard
+			goto('/account/dashboard', { replaceState: true });
 
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';

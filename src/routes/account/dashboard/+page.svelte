@@ -74,10 +74,10 @@
     <div class="dashboard-card actions-card">
       <h2>Quick Actions</h2>
       <div class="quick-actions">
-        <a href="/report" class="action-button lost-button">
+        <a href="/account/report" class="action-button lost-button">
           Report Lost Item
         </a>
-        <a href="/report?type=found" class="action-button found-button">
+        <a href="/account/report?type=found" class="action-button found-button">
           Report Found Item
         </a>
       </div>
