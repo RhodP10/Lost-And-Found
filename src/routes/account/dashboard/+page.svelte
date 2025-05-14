@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { authStore } from '$lib/stores/auth';
-  import { navigateToAccountPage } from '$lib/utils/navigation';
 
   let user = $state(null as any);
   let isLoading = $state(true);
@@ -27,7 +26,12 @@
 
   async function fetchUserItems() {
     try {
-      const response = await fetch('/api/user/items');
+      if (!user || !user.id) {
+        console.error('User ID not available');
+        return;
+      }
+
+      const response = await fetch(`/api/user/items?userId=${user.id}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch items');
@@ -115,11 +119,7 @@
                 <td>{item.category}</td>
                 <td>{item.date_reported}</td>
                 <td>
-                  <a href={`/account/items/${item.id}`} class="view-button" data-from-account="true" onclick={(e) => {
-                    // Ensure we stay in the account layout
-                    e.preventDefault();
-                    navigateToAccountPage(`/items/${item.id}`);
-                  }}>
+                  <a href={`/account/items/${item.id}`} class="view-button">
                     View
                   </a>
                 </td>

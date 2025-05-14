@@ -1,98 +1,52 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { authStore } from '$lib/stores/auth';
-  import { navigateToAccountPage } from '$lib/utils/navigation';
 
   let user = $state(null as any);
   let isLoading = $state(true);
   let userItems = $state([] as any[]);
   let activeTab = $state('all'); // 'all', 'lost', 'found'
-
-  // Success messages
-  let showDeletedMessage = $state(false);
+  let showDeleteModal = $state(false);
+  let isDeleting = $state(false);
+  let deleteError = $state('');
+  let itemToDelete = $state(null as any);
 
   onMount(() => {
     // Subscribe to auth store
     const unsubscribe = authStore.subscribe((value) => {
       user = value;
-
-      // When user changes, fetch items if user is available
-      if (user && user.id) {
-        isLoading = true;
-        fetchUserItems()
-          .catch(error => {
-            console.error('Error fetching user items:', error);
-          })
-          .finally(() => {
-            isLoading = false;
-          });
-      } else {
-        isLoading = false;
-      }
     });
 
-    // Check URL parameters for success messages
-    const url = new URL(window.location.href);
-    if (url.searchParams.has('deleted')) {
-      showDeletedMessage = true;
-
-      // Auto-hide the message after 5 seconds
-      setTimeout(() => {
-        showDeletedMessage = false;
-      }, 5000);
-
-      // Remove the parameter from URL without refreshing
-      url.searchParams.delete('deleted');
-      window.history.replaceState({}, '', url.toString());
+    // Fetch user's items
+    if (user) {
+      fetchUserItems().catch(error => {
+        console.error('Error fetching user items:', error);
+      });
     }
+
+    isLoading = false;
 
     return unsubscribe;
   });
 
   async function fetchUserItems() {
     try {
-      // Make sure we have a user
       if (!user || !user.id) {
-        console.error('No user ID available');
+        console.error('User ID not available');
         return;
       }
 
-      console.log('Fetching items for user ID:', user.id);
-
-      // Get user from localStorage for auth header
-      let authToken = '';
-      try {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          authToken = storedUser;
-        }
-      } catch (e) {
-        console.error('Error getting user from localStorage:', e);
-      }
-
-      // Fetch items for the current user
-      const response = await fetch('/api/user/items', {
-        headers: {
-          'Content-Type': 'application/json',
-          // Include user data in auth header as a backup
-          'Authorization': `Bearer ${authToken}`
-        },
-        credentials: 'include' // Include cookies in the request
-      });
+      const response = await fetch(`/api/user/items?userId=${user.id}`);
 
       if (!response.ok) {
         throw new Error('Failed to fetch items');
       }
 
       const data = await response.json();
-
-      // Format the date and update the items
       userItems = data.map((item: any) => ({
         ...item,
         date_reported: new Date(item.date_reported).toLocaleDateString()
       }));
-
-      console.log('Fetched user items:', userItems);
     } catch (error) {
       console.error('Error fetching user items:', error);
       userItems = [];
@@ -106,15 +60,23 @@
       : userItems.filter(item => item.status === activeTab)
   );
 
-  // Delete item function
-  async function deleteItem(itemId: number) {
+  // Function to open delete modal
+  function openDeleteModal(item: any) {
+    itemToDelete = item;
+    showDeleteModal = true;
+    deleteError = '';
+  }
+
+  // Function to delete an item
+  async function deleteItem() {
+    if (!itemToDelete) return;
+
     try {
-      const response = await fetch(`/api/items/${itemId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
+      isDeleting = true;
+      deleteError = '';
+
+      const response = await fetch(`/api/items/${itemToDelete.id}`, {
+        method: 'DELETE'
       });
 
       if (!response.ok) {
@@ -122,32 +84,22 @@
         throw new Error(errorData.error || 'Failed to delete item');
       }
 
-      // Show success message
-      showDeletedMessage = true;
+      // Remove the deleted item from the list
+      userItems = userItems.filter(item => item.id !== itemToDelete.id);
 
-      // Auto-hide the message after 5 seconds
-      setTimeout(() => {
-        showDeletedMessage = false;
-      }, 5000);
-
-      // Remove the item from the list
-      userItems = userItems.filter(item => item.id !== itemId);
-
+      // Close the modal
+      showDeleteModal = false;
+      itemToDelete = null;
     } catch (err) {
-      console.error('Error deleting item:', err);
-      alert('Failed to delete item: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      deleteError = err instanceof Error ? err.message : 'An error occurred';
+      console.error('Error deleting item:', deleteError);
+    } finally {
+      isDeleting = false;
     }
   }
 </script>
 
 <div class="my-items-container">
-  {#if showDeletedMessage}
-    <div class="success-message">
-      <span class="material-icons">check_circle</span>
-      Item successfully deleted.
-    </div>
-  {/if}
-
   <div class="my-items-header">
     <h1>My Items</h1>
     <a href="/account/report" class="report-button">
@@ -246,37 +198,53 @@
               </div>
             </div>
             <div class="item-actions">
-              <a href={`/account/items/${item.id}`} class="view-button" data-from-account="true" onclick={(e) => {
-                // Ensure we stay in the account layout
-                e.preventDefault();
-                navigateToAccountPage(`/items/${item.id}`);
-              }}>
+              <a href={`/account/items/${item.id}`} class="view-button">
                 View Details
               </a>
-              <div class="action-buttons">
-                <a href={`/account/items/${item.id}/edit`} class="action-button edit-button" title="Edit Item" onclick={(e) => {
-                  // Ensure we stay in the account layout
-                  e.preventDefault();
-                  navigateToAccountPage(`/items/${item.id}/edit`);
-                }}>
-                  <span class="material-icons">edit</span>
-                </a>
-                <button
-                  onclick={() => {
-                    if (confirm('Are you sure you want to delete this item?')) {
-                      deleteItem(item.id);
-                    }
-                  }}
-                  class="action-button delete-button"
-                  title="Delete Item"
-                >
-                  <span class="material-icons">delete</span>
-                </button>
-              </div>
+              <a href={`/account/items/edit/${item.id}`} class="edit-button">
+                <span class="material-icons">edit</span>
+                Edit
+              </a>
+              <button onclick={() => openDeleteModal(item)} class="delete-button">
+                <span class="material-icons">delete</span>
+                Delete
+              </button>
             </div>
           </div>
         </div>
       {/each}
+    </div>
+  {/if}
+
+  {#if showDeleteModal && itemToDelete}
+    <div class="modal-overlay">
+      <div class="modal-container">
+        <div class="modal-header">
+          <h3>Confirm Deletion</h3>
+          <button onclick={() => showDeleteModal = false} class="close-button">
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete this item?</p>
+          <p><strong>{itemToDelete.title}</strong></p>
+          <p>This action cannot be undone.</p>
+
+          {#if deleteError}
+            <div class="error-message">
+              {deleteError}
+            </div>
+          {/if}
+        </div>
+        <div class="modal-footer">
+          <button onclick={() => showDeleteModal = false} class="btn btn-secondary">
+            Cancel
+          </button>
+          <button onclick={deleteItem} class="btn btn-danger" disabled={isDeleting}>
+            {isDeleting ? 'Deleting...' : 'Delete Item'}
+          </button>
+        </div>
+      </div>
     </div>
   {/if}
 </div>
@@ -284,21 +252,6 @@
 <style>
   .my-items-container {
     max-width: 100%;
-  }
-
-  .success-message {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background-color: #d1e7dd;
-    color: #0f5132;
-    padding: 0.75rem 1rem;
-    border-radius: 0.375rem;
-    margin-bottom: 1rem;
-  }
-
-  .success-message .material-icons {
-    color: #0f5132;
   }
 
   .my-items-header {
@@ -497,59 +450,156 @@
   }
 
   .item-actions {
-    margin-top: auto;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .action-buttons {
-    display: flex;
+    flex-wrap: wrap;
     gap: 0.5rem;
+    margin-top: auto;
   }
 
-  .view-button {
-    display: inline-block;
-    padding: 0.5rem 1rem;
-    background-color: #EFDCAB;
-    color: #443627;
+  .view-button, .edit-button, .delete-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 0.75rem;
     border-radius: 0.375rem;
     text-decoration: none;
     font-weight: 500;
+    font-size: 0.875rem;
     transition: background-color 0.2s;
+  }
+
+  .view-button {
+    background-color: #EFDCAB;
+    color: #443627;
   }
 
   .view-button:hover {
     background-color: #e5d29d;
   }
 
-  .action-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-
   .edit-button {
-    background-color: #EFDCAB;
-    color: #443627;
+    background-color: #f3f4f6;
+    color: #4b5563;
   }
 
   .edit-button:hover {
-    background-color: #e5d29d;
+    background-color: #e5e7eb;
   }
 
   .delete-button {
-    background-color: #f8d7da;
-    color: #842029;
+    background-color: #fee2e2;
+    color: #b91c1c;
   }
 
   .delete-button:hover {
-    background-color: #f5c2c7;
+    background-color: #fecaca;
+  }
+
+  .btn {
+    padding: 0.75rem 1.25rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s, opacity 0.2s;
+  }
+
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .btn-secondary {
+    background-color: #f8f9fa;
+    color: #212529;
+    border: 1px solid #dee2e6;
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background-color: #e9ecef;
+  }
+
+  .btn-danger {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background-color: #bb2d3b;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+
+  .modal-container {
+    background-color: white;
+    border-radius: 0.5rem;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #EFDCAB;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    color: #443627;
+    font-size: 1.25rem;
+  }
+
+  .close-button {
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+  }
+
+  .close-button:hover {
+    background-color: #f3f4f6;
+    color: #1f2937;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #EFDCAB;
+    background-color: #f9fafb;
+  }
+
+  .error-message {
+    background-color: #fee2e2;
+    color: #b91c1c;
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
   }
 </style>

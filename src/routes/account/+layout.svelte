@@ -51,14 +51,9 @@
     } else if (path.includes('/profile')) {
       pageTitle = 'Profile';
     } else if (path.includes('/items')) {
-      // Check if it's an item details page
-      if (path.match(/\/items\/\d+$/)) {
-        pageTitle = 'Item Details';
-      } else if (path.includes('/edit')) {
-        pageTitle = 'Edit Item';
-      } else {
-        pageTitle = 'My Items';
-      }
+      pageTitle = 'My Items';
+    } else if (path.includes('/report')) {
+      pageTitle = 'Report Item';
     } else {
       pageTitle = 'Account';
     }
@@ -155,7 +150,7 @@
 <style>
   .account-layout {
     display: flex;
-    min-height: 100vh; /* Use full viewport height */
+    min-height: 100vh; /* Changed from calc(100vh - 60px) to 100vh */
   }
 
   .sidebar {
@@ -166,8 +161,8 @@
     flex-direction: column;
     padding: 1.5rem 0;
     position: sticky;
-    top: 0; /* Position at the top with no gap */
-    height: 100vh; /* Use full viewport height */
+    top: 0; /* Changed from 60px to 0 to remove the gap */
+    height: 100vh; /* Changed from calc(100vh - 60px) to 100vh */
   }
 
   .user-profile {

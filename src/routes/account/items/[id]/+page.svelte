@@ -1,636 +1,551 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { authStore } from '$lib/stores/auth';
-  import { navigateToAccountPage } from '$lib/utils/navigation';
+	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import type { Item } from '$lib/types';
+	import { authStore } from '$lib/stores/auth';
 
-  // Get the data from the server-side load function
-  let { data } = $props<{ data: { item: any } }>();
+	let item = $state<Item | null>(null);
+	let isLoading = $state(true);
+	let error = $state('');
+	let showContactInfo = $state(false);
+	let showDeleteModal = $state(false);
+	let isDeleting = $state(false);
+	let deleteError = $state('');
+	let user = $state(null as any);
 
-  let item = $state(data.item);
-  let isLoading = $state(false);
-  let error = $state('');
-  let user = $state(null as any);
+	onMount(() => {
+		// Subscribe to auth store
+		const unsubscribe = authStore.subscribe((value) => {
+			user = value;
+		});
 
-  // Format the date
-  if (item && item.date_reported) {
-    item.formatted_date = new Date(item.date_reported).toLocaleDateString();
-  }
+		// Load item data
+		loadItemData();
 
-  // Success messages
-  let showUpdatedMessage = $state(false);
+		// Return the unsubscribe function
+		return unsubscribe;
+	});
 
-  onMount(() => {
-    // Subscribe to auth store
-    const unsubscribe = authStore.subscribe((value) => {
-      user = value;
-    });
+	async function loadItemData() {
+		try {
+			isLoading = true;
+			// Get the ID from the URL path
+			const pathParts = window.location.pathname.split('/');
+			const id = pathParts[pathParts.length - 1];
 
-    // Check URL parameters for success messages
-    const url = new URL(window.location.href);
-    if (url.searchParams.has('updated')) {
-      showUpdatedMessage = true;
+			const response = await fetch(`/api/items/${id}`);
 
-      // Auto-hide the message after 5 seconds
-      setTimeout(() => {
-        showUpdatedMessage = false;
-      }, 5000);
+			if (!response.ok) {
+				if (response.status === 404) {
+					throw new Error('Item not found');
+				}
+				throw new Error('Failed to fetch item details');
+			}
 
-      // Remove the parameter from URL without refreshing
-      url.searchParams.delete('updated');
-      window.history.replaceState({}, '', url.toString());
-    }
+			item = await response.json();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+			console.error(error);
+		} finally {
+			isLoading = false;
+		}
+	}
 
-    return unsubscribe;
-  });
+	async function deleteItem() {
+		if (!item) return;
 
-  function goBack() {
-    // Use our navigation utility to ensure we stay in the account layout
-    navigateToAccountPage('/items');
-  }
+		try {
+			isDeleting = true;
+			deleteError = '';
 
-  // Delete confirmation
-  let showDeleteConfirm = $state(false);
-  let isDeleting = $state(false);
-  let deleteError = $state('');
+			const response = await fetch(`/api/items/${item.id}`, {
+				method: 'DELETE'
+			});
 
-  async function deleteItemHandler() {
-    if (!item || !item.id) return;
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || 'Failed to delete item');
+			}
 
-    try {
-      isDeleting = true;
-      deleteError = '';
+			// Navigate back to the items list
+			goto('/account/items');
+		} catch (err) {
+			deleteError = err instanceof Error ? err.message : 'An error occurred';
+			console.error('Error deleting item:', deleteError);
+		} finally {
+			isDeleting = false;
+			showDeleteModal = false;
+		}
+	}
 
-      const response = await fetch(`/api/items/${item.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include'
-      });
+	function formatDate(dateString: string | undefined) {
+		if (!dateString) return '';
+		return new Date(dateString).toLocaleDateString();
+	}
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete item');
-      }
-
-      // Redirect back to items list using our navigation utility
-      navigateToAccountPage('/items?deleted=true');
-
-    } catch (err) {
-      deleteError = err instanceof Error ? err.message : 'An error occurred';
-      console.error('Error deleting item:', deleteError);
-    } finally {
-      isDeleting = false;
-    }
-  }
-
-  function editItem() {
-    // Use our navigation utility to ensure we stay in the account layout
-    navigateToAccountPage(`/items/${item.id}/edit`);
-  }
+	function goBack() {
+		goto('/account/items');
+	}
 </script>
 
 <div class="item-details-container">
-  <div class="back-button-container">
-    <div class="actions-row">
-      <button onclick={goBack} class="back-button">
-        <span class="material-icons">arrow_back</span>
-        Back to My Items
-      </button>
+	<button onclick={goBack} class="back-button">
+		<span class="material-icons">arrow_back</span>
+		Back to My Items
+	</button>
 
-      <div class="action-buttons">
-        <button onclick={editItem} class="btn btn-edit" title="Edit Item">
-          <span class="material-icons">edit</span>
-          Edit
-        </button>
-        <button onclick={() => showDeleteConfirm = true} class="btn btn-delete" title="Delete Item">
-          <span class="material-icons">delete</span>
-          Delete
-        </button>
-      </div>
-    </div>
-  </div>
+	{#if isLoading}
+		<div class="loading-container">
+			<p>Loading item details...</p>
+		</div>
+	{:else if error}
+		<div class="error-container">
+			<p>{error}</p>
+			<button onclick={goBack} class="btn">Go Back</button>
+		</div>
+	{:else if item}
+		<div class="item-header">
+			<div>
+				<div class="status-badge" class:lost={item.status === 'lost'} class:found={item.status === 'found'} class:claimed={item.status === 'claimed'}>
+					{item.status}
+				</div>
+				<h1>{item.title}</h1>
+				<p class="reported-date">Reported on {formatDate(item.date_reported)}</p>
+			</div>
+			<div class="item-actions">
+				<button onclick={() => goto(`/account/items/edit/${item.id}`)} class="edit-button">
+					<span class="material-icons">edit</span>
+					Edit
+				</button>
+				<button onclick={() => showDeleteModal = true} class="delete-button">
+					<span class="material-icons">delete</span>
+					Delete
+				</button>
+			</div>
+		</div>
 
-  <!-- Success message for update -->
-  {#if showUpdatedMessage}
-    <div class="success-message">
-      <span class="material-icons">check_circle</span>
-      Item successfully updated.
-    </div>
-  {/if}
+		<div class="item-content">
+			<div class="item-details">
+				<div class="details-section">
+					<h2>Description</h2>
+					<p>{item.description || 'No description provided.'}</p>
+				</div>
 
-  <!-- Owner message -->
-  <div class="owner-message">
-    <span class="material-icons">person</span>
-    You are viewing your own item. You can edit or delete it using the buttons above.
-  </div>
+				<div class="details-grid">
+					<div class="details-section">
+						<h2>Category</h2>
+						<p>{item.category}</p>
+					</div>
 
-  <!-- Delete confirmation modal -->
-  {#if showDeleteConfirm}
-    <div class="modal-overlay">
-      <div class="modal-content">
-        <h3>Delete Item</h3>
-        <p>Are you sure you want to delete this item? This action cannot be undone.</p>
+					<div class="details-section">
+						<h2>Location</h2>
+						<p>{item.location || 'Not specified'}</p>
+					</div>
 
-        {#if deleteError}
-          <div class="error-alert">
-            <p>{deleteError}</p>
-          </div>
-        {/if}
+					<div class="details-section">
+						<h2>Floor</h2>
+						<p>{item.floor || 'Not specified'}</p>
+					</div>
 
-        <div class="modal-actions">
-          <button
-            onclick={() => showDeleteConfirm = false}
-            class="btn btn-secondary"
-            disabled={isDeleting}
-          >
-            Cancel
-          </button>
-          <button
-            onclick={deleteItemHandler}
-            class="btn btn-delete"
-            disabled={isDeleting}
-          >
-            {isDeleting ? 'Deleting...' : 'Delete'}
-          </button>
-        </div>
-      </div>
-    </div>
-  {/if}
+					<div class="details-section">
+						<h2>Room Number</h2>
+						<p>{item.room_number || 'Not specified'}</p>
+					</div>
+				</div>
 
-  {#if isLoading}
-    <div class="loading">
-      <p>Loading item details...</p>
-    </div>
-  {:else if error}
-    <div class="error-message">
-      <p>{error}</p>
-      <button onclick={goBack} class="btn btn-primary mt-3">
-        Go Back
-      </button>
-    </div>
-  {:else if item}
-    <div class="item-details-card">
-      <div class="item-header">
-        <div class="item-title-section">
-          <div class="item-status" class:lost={item.status === 'lost'} class:found={item.status === 'found'}>
-            {item.status.toUpperCase()}
-          </div>
-          <h1 class="item-title">{item.title}</h1>
-        </div>
-        <div class="item-date">
-          Reported on {item.formatted_date || new Date(item.date_reported).toLocaleDateString()}
-        </div>
-      </div>
+				{#if item.image_url}
+					<div class="details-section">
+						<h2>Image</h2>
+						<div class="item-image">
+							<img src={item.image_url} alt={item.title} />
+						</div>
+					</div>
+				{/if}
 
-      <div class="item-content">
-        <div class="item-image-container">
-          {#if item.image_url}
-            <img src={item.image_url} alt={item.title} class="item-image" />
-          {:else}
-            <div class="no-image">
-              <span class="material-icons">image_not_supported</span>
-              <p>No image available</p>
-            </div>
-          {/if}
-        </div>
+				<div class="details-section contact-info">
+					<h2>Contact Information</h2>
+					{#if showContactInfo}
+						<div class="contact-details">
+							<p><strong>Name:</strong> {item.reporter_name}</p>
+							<p><strong>Email:</strong> {item.reporter_email}</p>
+							{#if item.reporter_phone}
+								<p><strong>Phone:</strong> {item.reporter_phone}</p>
+							{/if}
+						</div>
+					{:else}
+						<p>Contact information is hidden to protect privacy.</p>
+						<button onclick={() => showContactInfo = true} class="show-contact-btn">
+							Show Contact Info
+						</button>
+					{/if}
+				</div>
+			</div>
+		</div>
+	{:else}
+		<div class="error-container">
+			<p>Item not found</p>
+			<button onclick={goBack} class="btn">Go Back</button>
+		</div>
+	{/if}
 
-        <div class="item-info">
-          <div class="info-section">
-            <h2>Item Details</h2>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">Category</span>
-                <span class="info-value">{item.category}</span>
-              </div>
-            </div>
+	{#if showDeleteModal && item}
+		<div class="modal-overlay">
+			<div class="modal-container">
+				<div class="modal-header">
+					<h3>Confirm Deletion</h3>
+					<button onclick={() => showDeleteModal = false} class="close-button">
+						<span class="material-icons">close</span>
+					</button>
+				</div>
+				<div class="modal-body">
+					<p>Are you sure you want to delete this item?</p>
+					<p><strong>{item.title}</strong></p>
+					<p>This action cannot be undone.</p>
 
-            {#if item.description}
-              <div class="description-section">
-                <h3>Description</h3>
-                <p>{item.description}</p>
-              </div>
-            {/if}
-          </div>
-
-          <div class="info-section">
-            <h2>Location Information</h2>
-            <div class="location-grid">
-              <div class="location-row">
-                <div class="location-item">
-                  <h3>Location</h3>
-                  <p>{item.location || 'Not specified'}</p>
-                </div>
-                <div class="location-item">
-                  <h3>Floor</h3>
-                  <p>{item.floor || 'Not specified'}</p>
-                </div>
-              </div>
-              {#if item.room_number}
-                <div class="location-row">
-                  <div class="location-item">
-                    <h3>Room Number</h3>
-                    <p>{item.room_number}</p>
-                  </div>
-                </div>
-              {/if}
-            </div>
-          </div>
-
-          <div class="info-section">
-            <h2>Contact Information</h2>
-            <p class="contact-hidden">Contact information is hidden to protect privacy.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  {:else}
-    <div class="error-message">
-      <p>Item not found</p>
-      <button onclick={goBack} class="btn btn-primary mt-3">
-        Go Back
-      </button>
-    </div>
-  {/if}
+					{#if deleteError}
+						<div class="error-message">
+							{deleteError}
+						</div>
+					{/if}
+				</div>
+				<div class="modal-footer">
+					<button onclick={() => showDeleteModal = false} class="btn btn-secondary">
+						Cancel
+					</button>
+					<button onclick={deleteItem} class="btn btn-danger" disabled={isDeleting}>
+						{isDeleting ? 'Deleting...' : 'Delete Item'}
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
 </div>
 
 <style>
-  .item-details-container {
-    max-width: 100%;
-    padding-bottom: 2rem;
-  }
+	.item-details-container {
+		max-width: 100%;
+	}
 
-  .back-button-container {
-    margin-bottom: 1.5rem;
-  }
+	.back-button {
+		display: flex;
+		align-items: center;
+		background: none;
+		border: none;
+		color: #443627;
+		font-weight: 500;
+		padding: 0;
+		margin-bottom: 1.5rem;
+		cursor: pointer;
+	}
 
-  .actions-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-  }
+	.back-button:hover {
+		color: #D98324;
+	}
 
-  .action-buttons {
-    display: flex;
-    gap: 0.5rem;
-  }
+	.back-button .material-icons {
+		margin-right: 0.5rem;
+		font-size: 1.25rem;
+	}
 
-  .back-button {
-    display: flex;
-    align-items: center;
-    background: none;
-    border: none;
-    color: #443627;
-    font-weight: 500;
-    padding: 0;
-    cursor: pointer;
-  }
+	.loading-container, .error-container {
+		background-color: white;
+		border-radius: 0.5rem;
+		padding: 2rem;
+		text-align: center;
+		margin-top: 1rem;
+	}
 
-  .back-button:hover {
-    color: #D98324;
-  }
+	.error-container p {
+		color: #ef4444;
+		margin-bottom: 1rem;
+	}
 
-  .back-button .material-icons {
-    margin-right: 0.5rem;
-  }
+	.item-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: flex-start;
+		margin-bottom: 1.5rem;
+	}
 
-  .btn-edit {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    background-color: #EFDCAB;
-    color: #443627;
-    border: none;
-  }
+	.item-header h1 {
+		color: #443627;
+		margin: 0.5rem 0;
+		font-size: 1.75rem;
+	}
 
-  .btn-edit:hover {
-    background-color: #e5d29d;
-  }
+	.reported-date {
+		color: #6b7280;
+		font-size: 0.875rem;
+	}
 
-  .btn-delete {
-    display: flex;
-    align-items: center;
-    gap: 0.25rem;
-    background-color: #f8d7da;
-    color: #842029;
-    border: none;
-  }
+	.item-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
 
-  .btn-delete:hover {
-    background-color: #f5c2c7;
-  }
+	.edit-button, .delete-button {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.5rem 0.75rem;
+		border-radius: 0.375rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		cursor: pointer;
+		border: none;
+		transition: background-color 0.2s;
+	}
 
-  .btn-secondary {
-    background-color: #e9ecef;
-    color: #212529;
-    border: none;
-  }
+	.edit-button {
+		background-color: #f3f4f6;
+		color: #4b5563;
+	}
 
-  .btn-secondary:hover {
-    background-color: #dde2e6;
-  }
+	.edit-button:hover {
+		background-color: #e5e7eb;
+	}
 
-  /* Modal styles */
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-  }
+	.delete-button {
+		background-color: #fee2e2;
+		color: #b91c1c;
+	}
 
-  .modal-content {
-    background-color: white;
-    border-radius: 0.5rem;
-    padding: 1.5rem;
-    width: 90%;
-    max-width: 500px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  }
+	.delete-button:hover {
+		background-color: #fecaca;
+	}
 
-  .modal-content h3 {
-    color: #443627;
-    margin-top: 0;
-    margin-bottom: 1rem;
-  }
+	.status-badge {
+		display: inline-block;
+		padding: 0.25rem 0.75rem;
+		border-radius: 9999px;
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		font-weight: bold;
+		margin-bottom: 0.5rem;
+	}
 
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-top: 1.5rem;
-  }
+	.status-badge.lost {
+		background-color: #f8d7da;
+		color: #842029;
+	}
 
-  .error-alert {
-    background-color: #f8d7da;
-    color: #842029;
-    padding: 0.75rem;
-    border-radius: 0.25rem;
-    margin-top: 1rem;
-  }
+	.status-badge.found {
+		background-color: #d1e7dd;
+		color: #0f5132;
+	}
 
-  .loading, .error-message {
-    background-color: white;
-    border-radius: 0.5rem;
-    padding: 3rem;
-    text-align: center;
-  }
+	.status-badge.claimed {
+		background-color: #EFDCAB;
+		color: #443627;
+	}
 
-  .error-message {
-    color: #842029;
-  }
+	.item-content {
+		display: flex;
+		gap: 2rem;
+	}
 
-  .success-message {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background-color: #d1e7dd;
-    color: #0f5132;
-    padding: 0.75rem 1rem;
-    border-radius: 0.375rem;
-    margin-bottom: 1rem;
-  }
+	.item-details {
+		flex: 1;
+		background-color: white;
+		border-radius: 0.5rem;
+		overflow: hidden;
+	}
 
-  .success-message .material-icons {
-    color: #0f5132;
-  }
+	.details-section {
+		padding: 1.5rem;
+		border-bottom: 1px solid #EFDCAB;
+	}
 
-  .owner-message {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    background-color: #e2e3e5;
-    color: #41464b;
-    padding: 0.75rem 1rem;
-    border-radius: 0.375rem;
-    margin-bottom: 1rem;
-    font-size: 0.875rem;
-  }
+	.details-section:last-child {
+		border-bottom: none;
+	}
 
-  .owner-message .material-icons {
-    color: #41464b;
-    font-size: 1.25rem;
-  }
+	.details-section h2 {
+		color: #443627;
+		font-size: 1.25rem;
+		margin-top: 0;
+		margin-bottom: 0.75rem;
+	}
 
-  .item-details-card {
-    background-color: white;
-    border-radius: 0.5rem;
-    overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  }
+	.details-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+	}
 
-  .item-header {
-    padding: 1.5rem;
-    border-bottom: 1px solid #EFDCAB;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 1rem;
-  }
+	.details-grid .details-section {
+		border-right: 1px solid #EFDCAB;
+	}
 
-  .item-title-section {
-    flex: 1;
-  }
+	.details-grid .details-section:nth-child(2n) {
+		border-right: none;
+	}
 
-  .item-status {
-    display: inline-block;
-    padding: 0.25rem 0.5rem;
-    border-radius: 0.25rem;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-  }
+	.item-image {
+		max-width: 100%;
+		border-radius: 0.375rem;
+		overflow: hidden;
+	}
 
-  .item-status.lost {
-    background-color: #f8d7da;
-    color: #842029;
-  }
+	.item-image img {
+		width: 100%;
+		max-height: 400px;
+		object-fit: contain;
+	}
 
-  .item-status.found {
-    background-color: #d1e7dd;
-    color: #0f5132;
-  }
+	.contact-info {
+		background-color: #f9fafb;
+	}
 
-  .item-title {
-    margin: 0;
-    color: #443627;
-    font-size: 1.75rem;
-  }
+	.contact-details {
+		margin-top: 1rem;
+	}
 
-  .item-date {
-    color: #6c757d;
-    font-size: 0.875rem;
-  }
+	.contact-details p {
+		margin-bottom: 0.5rem;
+	}
 
-  .item-content {
-    display: flex;
-    flex-direction: column;
-  }
+	.show-contact-btn {
+		background-color: #D98324;
+		color: white;
+		border: none;
+		border-radius: 0.375rem;
+		padding: 0.5rem 1rem;
+		font-weight: 500;
+		cursor: pointer;
+		margin-top: 0.5rem;
+		transition: background-color 0.2s;
+	}
 
-  @media (min-width: 768px) {
-    .item-content {
-      flex-direction: row;
-    }
-  }
+	.show-contact-btn:hover {
+		background-color: #c47520;
+	}
 
-  .item-image-container {
-    padding: 1.5rem;
-    width: 100%;
-  }
+	.btn {
+		background-color: #D98324;
+		color: white;
+		border: none;
+		border-radius: 0.375rem;
+		padding: 0.5rem 1rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background-color 0.2s, opacity 0.2s;
+	}
 
-  @media (min-width: 768px) {
-    .item-image-container {
-      width: 40%;
-    }
-  }
+	.btn:hover {
+		background-color: #c47520;
+	}
 
-  .item-image {
-    width: 100%;
-    max-height: 400px;
-    object-fit: contain;
-    border-radius: 0.375rem;
-  }
+	.btn:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+	}
 
-  .no-image {
-    width: 100%;
-    height: 300px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background-color: #f8f9fa;
-    color: #adb5bd;
-    border-radius: 0.375rem;
-  }
+	.btn-secondary {
+		background-color: #f8f9fa;
+		color: #212529;
+		border: 1px solid #dee2e6;
+	}
 
-  .no-image .material-icons {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-  }
+	.btn-secondary:hover:not(:disabled) {
+		background-color: #e9ecef;
+	}
 
-  .item-info {
-    flex: 1;
-    padding: 1.5rem;
-  }
+	.btn-danger {
+		background-color: #dc3545;
+		color: white;
+		border: none;
+	}
 
-  .info-section {
-    margin-bottom: 2rem;
-  }
+	.btn-danger:hover:not(:disabled) {
+		background-color: #bb2d3b;
+	}
 
-  .info-section h2 {
-    color: #443627;
-    font-size: 1.25rem;
-    margin-top: 0;
-    margin-bottom: 1rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid #EFDCAB;
-  }
+	.modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background-color: rgba(0, 0, 0, 0.5);
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		z-index: 1000;
+	}
 
-  .info-grid {
-    display: grid;
-    grid-template-columns: repeat(1, 1fr);
-    gap: 1rem;
-  }
+	.modal-container {
+		background-color: white;
+		border-radius: 0.5rem;
+		width: 90%;
+		max-width: 500px;
+		box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+		overflow: hidden;
+	}
 
-  @media (min-width: 768px) {
-    .info-grid {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
+	.modal-header {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 1rem 1.5rem;
+		border-bottom: 1px solid #EFDCAB;
+	}
 
-  .info-item {
-    display: flex;
-    flex-direction: column;
-  }
+	.modal-header h3 {
+		margin: 0;
+		color: #443627;
+		font-size: 1.25rem;
+	}
 
-  .info-label {
-    font-weight: 500;
-    color: #6c757d;
-    margin-bottom: 0.25rem;
-    font-size: 0.875rem;
-  }
+	.close-button {
+		background: none;
+		border: none;
+		color: #6b7280;
+		cursor: pointer;
+		padding: 0.25rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 9999px;
+	}
 
-  .info-value {
-    color: #212529;
-  }
+	.close-button:hover {
+		background-color: #f3f4f6;
+		color: #1f2937;
+	}
 
-  .description-section {
-    margin-top: 1rem;
-  }
+	.modal-body {
+		padding: 1.5rem;
+	}
 
-  .description-section h3 {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-    color: #443627;
-  }
+	.modal-footer {
+		display: flex;
+		justify-content: flex-end;
+		gap: 0.75rem;
+		padding: 1rem 1.5rem;
+		border-top: 1px solid #EFDCAB;
+		background-color: #f9fafb;
+	}
 
-  .description-section p {
-    white-space: pre-line;
-    color: #212529;
-  }
+	.error-message {
+		background-color: #fee2e2;
+		color: #b91c1c;
+		padding: 0.75rem;
+		border-radius: 0.375rem;
+		margin-top: 1rem;
+		font-size: 0.875rem;
+	}
 
-  .location-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
+	@media (max-width: 768px) {
+		.item-content {
+			flex-direction: column;
+		}
 
-  .location-row {
-    display: flex;
-    gap: 2rem;
-  }
+		.details-grid {
+			grid-template-columns: 1fr;
+		}
 
-  .location-item h3 {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-    color: #443627;
-  }
-
-  .location-item p {
-    color: #212529;
-  }
-
-  .contact-hidden {
-    color: #6c757d;
-    font-style: italic;
-    margin-top: 0.5rem;
-  }
-
-  .btn {
-    display: inline-block;
-    font-weight: 400;
-    text-align: center;
-    white-space: nowrap;
-    vertical-align: middle;
-    user-select: none;
-    border: 1px solid transparent;
-    padding: 0.5rem 1rem;
-    font-size: 1rem;
-    line-height: 1.5;
-    border-radius: 0.25rem;
-    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-  }
-
-  .btn-primary {
-    color: white;
-    background-color: #D98324;
-    border-color: #D98324;
-  }
-
-  .btn-primary:hover {
-    background-color: #c47520;
-    border-color: #c47520;
-  }
-
-  .mt-3 {
-    margin-top: 1rem;
-  }
+		.details-grid .details-section {
+			border-right: none;
+		}
+	}
 </style>

@@ -28,9 +28,6 @@ export const POST: RequestHandler = async ({ request }) => {
   try {
     const itemData = await request.json();
 
-    // Log the user ID for debugging
-    console.log('Creating item with user ID:', itemData.user_id);
-
     const newItem = createItem({
       title: itemData.title,
       description: itemData.description,
@@ -46,7 +43,6 @@ export const POST: RequestHandler = async ({ request }) => {
       user_id: itemData.user_id
     });
 
-    console.log('Item created successfully with ID:', newItem.id);
     return json(newItem, { status: 201 });
   } catch (error) {
     console.error('Error creating item:', error);

@@ -120,31 +120,7 @@ export function getItems(filters = {}) {
 }
 
 export function getItemById(id) {
-  try {
-    // Ensure id is a number
-    const numericId = parseInt(id, 10);
-
-    if (isNaN(numericId)) {
-      console.error(`Invalid item ID: ${id} is not a number`);
-      return null;
-    }
-
-    console.log(`Getting item with ID: ${numericId}`);
-
-    // Execute the query with the numeric ID
-    const item = db.prepare('SELECT * FROM items WHERE id = ?').get(numericId);
-
-    if (!item) {
-      console.error(`No item found with ID: ${numericId}`);
-      return null;
-    }
-
-    console.log(`Found item with ID ${numericId}:`, JSON.stringify(item, null, 2));
-    return item;
-  } catch (error) {
-    console.error(`Error in getItemById(${id}):`, error);
-    return null;
-  }
+  return db.prepare('SELECT * FROM items WHERE id = ?').get(id);
 }
 
 export function createItem(item) {
@@ -181,167 +157,51 @@ export function createItem(item) {
 }
 
 export function updateItem(id, item) {
-  try {
-    // Ensure id is a number
-    const numericId = parseInt(id, 10);
+  const stmt = db.prepare(`
+    UPDATE items SET
+      title = ?,
+      description = ?,
+      category = ?,
+      status = ?,
+      location = ?,
+      floor = ?,
+      room_number = ?,
+      reporter_name = ?,
+      reporter_email = ?,
+      reporter_phone = ?,
+      image_url = ?,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
 
-    if (isNaN(numericId)) {
-      console.error(`Invalid item ID: ${id} is not a number`);
-      return null;
-    }
+  const result = stmt.run(
+    item.title,
+    item.description || null,
+    item.category,
+    item.status,
+    item.location || null,
+    item.floor || null,
+    item.room_number || null,
+    item.reporter_name,
+    item.reporter_email,
+    item.reporter_phone || null,
+    item.image_url || null,
+    id
+  );
 
-    // Log the update operation
-    console.log(`SQLite updateItem for ID ${numericId}:`, JSON.stringify(item, null, 2));
-
-    // First, check if the item exists
-    const existingItem = getItemById(numericId);
-    if (!existingItem) {
-      console.error(`Item with ID ${numericId} not found in database`);
-      return null;
-    }
-
-    console.log(`Existing item found:`, JSON.stringify(existingItem, null, 2));
-
-    // Prepare the SQL statement
-    const sql = `
-      UPDATE items SET
-        title = ?,
-        description = ?,
-        category = ?,
-        status = ?,
-        location = ?,
-        floor = ?,
-        room_number = ?,
-        reporter_name = ?,
-        reporter_email = ?,
-        reporter_phone = ?,
-        image_url = ?,
-        user_id = ?,
-        updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `;
-
-    // Validate required fields
-    if (!item.title) {
-      console.error('Title is required for update');
-      return null;
-    }
-
-    if (!item.category) {
-      console.error('Category is required for update');
-      return null;
-    }
-
-    // Prepare parameters with proper type handling
-    const title = String(item.title);
-    const description = item.description ? String(item.description) : null;
-    const category = String(item.category);
-    const status = String(item.status || 'lost');
-    const location = item.location ? String(item.location) : null;
-    const floor = item.floor ? String(item.floor) : null;
-    const roomNumber = item.room_number ? String(item.room_number) : null;
-    const reporterName = item.reporter_name ? String(item.reporter_name) : null;
-    const reporterEmail = item.reporter_email ? String(item.reporter_email) : null;
-    const reporterPhone = item.reporter_phone ? String(item.reporter_phone) : null;
-    const imageUrl = item.image_url ? String(item.image_url) : null;
-
-    // Handle user_id specially to ensure it's a number or null
-    let userId = null;
-    if (item.user_id !== undefined && item.user_id !== null) {
-      userId = parseInt(item.user_id, 10);
-      if (isNaN(userId)) {
-        console.warn(`Invalid user_id: ${item.user_id}, setting to null`);
-        userId = null;
-      }
-    }
-
-    console.log(`Executing SQL: ${sql}`);
-
-    // Log all parameters
-    console.log(`SQL parameters for update:
-      title: ${title}
-      description: ${description}
-      category: ${category}
-      status: ${status}
-      location: ${location}
-      floor: ${floor}
-      room_number: ${roomNumber}
-      reporter_name: ${reporterName}
-      reporter_email: ${reporterEmail}
-      reporter_phone: ${reporterPhone}
-      image_url: ${imageUrl}
-      user_id: ${userId}
-      id: ${numericId}
-    `);
-
-    // Prepare and execute the statement
-    try {
-      const stmt = db.prepare(sql);
-      const result = stmt.run(
-        title,
-        description,
-        category,
-        status,
-        location,
-        floor,
-        roomNumber,
-        reporterName,
-        reporterEmail,
-        reporterPhone,
-        imageUrl,
-        userId,
-        numericId
-      );
-
-      console.log(`Update result:`, JSON.stringify(result, null, 2));
-
-      if (result.changes > 0) {
-        // Get the updated item to return
-        const updatedItem = getItemById(numericId);
-        console.log(`Updated item:`, JSON.stringify(updatedItem, null, 2));
-        return updatedItem;
-      }
-
-      console.log(`No changes made to item ${numericId}`);
-      return existingItem; // Return the existing item if no changes were made
-    } catch (sqlError) {
-      console.error(`SQL error in updateItem:`, sqlError);
-      throw sqlError;
-    }
-  } catch (error) {
-    console.error(`Error in updateItem function:`, error);
-    throw error; // Re-throw the error for the caller to handle
+  if (result.changes > 0) {
+    return {
+      id,
+      ...item
+    };
   }
+
+  return null;
 }
 
 export function deleteItem(id) {
-  try {
-    // Ensure id is a number
-    const numericId = parseInt(id, 10);
-
-    if (isNaN(numericId)) {
-      console.error(`Invalid item ID: ${id} is not a number`);
-      return false;
-    }
-
-    console.log(`Deleting item with ID: ${numericId}`);
-
-    // First check if the item exists
-    const item = getItemById(numericId);
-    if (!item) {
-      console.error(`Item with ID ${numericId} not found for deletion`);
-      return false;
-    }
-
-    // Execute the delete operation
-    const result = db.prepare('DELETE FROM items WHERE id = ?').run(numericId);
-
-    console.log(`Delete result:`, result);
-    return result.changes > 0;
-  } catch (error) {
-    console.error(`Error in deleteItem function:`, error);
-    return false;
-  }
+  const result = db.prepare('DELETE FROM items WHERE id = ?').run(id);
+  return result.changes > 0;
 }
 
 // Category-related functions
@@ -349,62 +209,50 @@ export function getCategories() {
   return db.prepare('SELECT * FROM categories ORDER BY name').all();
 }
 
-// Update user information
-export async function updateUser(userId, userData) {
-  // Check if user exists
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
-  if (!user) {
-    throw new Error('User not found');
-  }
-
-  // Build SQL query dynamically based on what's being updated
-  let sql = 'UPDATE users SET ';
-  const params = [];
-  const setClauses = [];
-
-  // Add fields to update
-  if (userData.email !== undefined) {
-    setClauses.push('email = ?');
-    params.push(userData.email);
-  }
+export function updateUser(id, userData) {
+  // Build the SQL query dynamically based on what fields are being updated
+  let fields = [];
+  let params = [];
 
   if (userData.username !== undefined) {
-    setClauses.push('username = ?');
+    fields.push('username = ?');
     params.push(userData.username);
   }
 
+  if (userData.email !== undefined) {
+    fields.push('email = ?');
+    params.push(userData.email);
+  }
+
   if (userData.full_name !== undefined) {
-    setClauses.push('full_name = ?');
+    fields.push('full_name = ?');
     params.push(userData.full_name);
   }
 
   if (userData.password !== undefined) {
-    setClauses.push('password = ?');
+    fields.push('password = ?');
     params.push(userData.password);
   }
 
   // Always update the updated_at timestamp
-  setClauses.push('updated_at = CURRENT_TIMESTAMP');
+  fields.push('updated_at = CURRENT_TIMESTAMP');
 
-  sql += setClauses.join(', ');
-  sql += ' WHERE id = ?';
-  params.push(userId);
+  // Add the ID as the last parameter
+  params.push(id);
 
-  // Execute the update
-  const stmt = db.prepare(sql);
-  const result = stmt.run(...params);
+  // Create and execute the update statement
+  const query = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+  const result = db.prepare(query).run(...params);
 
-  if (result.changes === 0) {
-    return null;
+  if (result.changes > 0) {
+    // Return the updated user
+    return db.prepare('SELECT id, username, email, full_name, created_at, updated_at FROM users WHERE id = ?').get(id);
   }
 
-  // Get the updated user (without password)
-  const updatedUser = db.prepare('SELECT id, email, username, full_name, created_at, updated_at FROM users WHERE id = ?').get(userId);
-  return updatedUser;
+  return null;
 }
 
 export default {
-  db, // Export the database object for debugging
   findUserByEmail,
   findUserByUsername,
   findUserByUsernameOrEmail,

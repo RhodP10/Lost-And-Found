@@ -2,6 +2,7 @@
   import { authStore } from '$lib/stores/auth';
 
   let isEditing = $state(false);
+  let isLoading = $state(false);
 
   // Get user from auth store
   let user = $derived($authStore);
@@ -13,7 +14,6 @@
   let currentPassword = $state('');
   let newPassword = $state('');
   let confirmPassword = $state('');
-  let isLoading = $state(false);
 
   // Form validation
   let errors = $state({} as {
@@ -73,74 +73,51 @@
   async function handleSubmit() {
     if (!validateForm()) return;
 
-    try {
-      // Show loading state
-      isLoading = true;
-      errors = {};
-      success = '';
+    isLoading = true;
+    errors.general = '';
 
-      // Prepare the update data
-      const updateData: {
-        email: string;
+    try {
+      // Prepare the data to send to the API
+      const userData: {
+        id: any;
         username: string;
+        email: string;
         full_name: string;
-        currentPassword?: string;
-        newPassword?: string;
+        current_password?: string;
+        new_password?: string;
       } = {
-        email,
+        id: user.id,
         username,
+        email,
         full_name: fullName
       };
 
-      // Add password data if changing password
+      // Add password data if the user is trying to change it
       if (newPassword) {
-        updateData.currentPassword = currentPassword;
-        updateData.newPassword = newPassword;
+        userData.current_password = currentPassword;
+        userData.new_password = newPassword;
       }
 
-      console.log('Sending profile update request');
-
-      // Call the API endpoint
-      const response = await fetch('/api/user/update', {
-        method: 'PUT',
+      // Call the API to update the profile
+      const response = await fetch('/api/user/update-profile', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(updateData),
-        credentials: 'include' // Include cookies in the request
+        body: JSON.stringify(userData)
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
       if (!response.ok) {
-        // Handle specific error messages
-        if (data.error === 'Email already in use') {
-          errors.email = 'This email is already in use by another account';
-        } else if (data.error === 'Username already taken') {
-          errors.username = 'This username is already taken by another account';
-        } else if (data.error === 'Current password is incorrect') {
-          errors.currentPassword = 'Current password is incorrect';
-        } else {
-          errors.general = data.error || 'Failed to update profile. Please try again.';
-        }
-        throw new Error(data.error || 'Failed to update profile');
+        throw new Error(result.error || 'Failed to update profile');
       }
 
       // Update user in auth store with the returned user data
-      if (data.user) {
-        authStore.login(data.user);
-      } else {
-        // Fallback if the API doesn't return the updated user
-        const updatedUser = {
-          ...user,
-          email,
-          username,
-          full_name: fullName
-        };
-        authStore.login(updatedUser);
-      }
+      authStore.login(result.user);
 
-      success = 'Profile updated successfully!';
+      // Show success message and exit edit mode
+      success = result.message || 'Profile updated successfully!';
       isEditing = false;
 
       // Reset password fields
@@ -148,11 +125,9 @@
       newPassword = '';
       confirmPassword = '';
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile:', error);
-      if (!Object.keys(errors).length) {
-        errors.general = 'Failed to update profile. Please try again.';
-      }
+      errors.general = error.message || 'Failed to update profile. Please try again.';
     } finally {
       isLoading = false;
     }
@@ -428,16 +403,6 @@
     border-radius: 0.375rem;
     cursor: pointer;
     font-weight: 500;
-    transition: all 0.2s;
-  }
-
-  .cancel-button:hover:not(:disabled) {
-    background-color: #e2e6ea;
-  }
-
-  .cancel-button:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
   }
 
   .save-button {
@@ -448,14 +413,14 @@
     border-radius: 0.375rem;
     cursor: pointer;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: background-color 0.2s, opacity 0.2s;
   }
 
   .save-button:hover:not(:disabled) {
     background-color: #c47520;
   }
 
-  .save-button:disabled {
+  .save-button:disabled, .cancel-button:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
