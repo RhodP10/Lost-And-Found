@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Item } from '$lib/types';
+	import './item-details.css';
 
 	let item: Item | null = null;
 	let isLoading = true;
 	let error = '';
 	let showContactInfo = false;
+	let showImageModal = false;
 
 	onMount(async () => {
 		try {
@@ -38,108 +40,191 @@
 	function goBack() {
 		window.history.back();
 	}
+
+	function openImageModal() {
+		showImageModal = true;
+		// Add a class to the body to prevent scrolling
+		document.body.style.overflow = 'hidden';
+	}
+
+	function closeImageModal() {
+		showImageModal = false;
+		// Remove the class from the body to allow scrolling
+		document.body.style.overflow = '';
+	}
+
+	// Close modal when clicking outside the image
+	function handleModalClick(event: MouseEvent) {
+		if (event.target === event.currentTarget) {
+			closeImageModal();
+		}
+	}
+
+	// Close modal when pressing Escape key
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Escape' && showImageModal) {
+			closeImageModal();
+		}
+	}
 </script>
 
-<div>
+<svelte:window on:keydown={handleKeydown} />
+
+<div class="item-details-container">
 	{#if isLoading}
-		<div class="text-center p-4">
+		<div class="loading-container">
+			<div class="loading-spinner"></div>
 			<p>Loading item details...</p>
 		</div>
 	{:else if error}
-		<div class="text-center p-4">
-			<p style="color: red;">{error}</p>
-			<a href="/" class="mt-3" style="display: inline-block;">Return to Home</a>
+		<div class="error-container">
+			<p class="error-message">{error}</p>
+			<a href="/" class="home-link">Return to Home</a>
 		</div>
 	{:else if item}
-		<div class="mb-3">
-			<button on:click={goBack} class="flex items-center" style="background: none; border: none; color: #3b82f6; cursor: pointer; padding: 0;">
-				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 24 24" style="margin-right: 4px;">
-					<path d="M10 19l-7-7m0 0l7-7m-7 7h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-				</svg>
-				Back
-			</button>
-		</div>
+		<button on:click={goBack} class="back-button">
+			<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+				<path d="M10 19l-7-7m0 0l7-7m-7 7h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+			</svg>
+			Back to Items
+		</button>
 
-		<div class="card">
-			<div class="card-body">
-				<div class="flex justify-between items-start mb-3">
-					<div>
-						<span class="badge {item.status === 'lost' ? 'badge-lost' : item.status === 'found' ? 'badge-found' : 'badge-claimed'} mb-2">
-							{item.status === 'lost' ? 'Lost' : item.status === 'found' ? 'Found' : 'Claimed'}
-						</span>
-						<h1 class="mb-0">{item.title}</h1>
-					</div>
-					<div>
-						Reported on {new Date(item.date_reported || '').toLocaleDateString()}
+		<div class="item-details-card">
+			<div class="item-header">
+				<div class="item-title-container">
+					<span class="item-status-badge {item.status}">
+						{item.status === 'lost' ? 'Lost' : item.status === 'found' ? 'Found' : 'Claimed'}
+					</span>
+					<h1 class="item-title">{item.title}</h1>
+				</div>
+				<div class="item-date">
+					Reported on {new Date(item.date_reported || '').toLocaleDateString()}
+				</div>
+			</div>
+
+			<div class="item-content">
+				<div class="item-section">
+					<h2 class="section-title">Description</h2>
+					<p class="item-description">{item.description || 'No description provided.'}</p>
+				</div>
+
+				<div class="item-section">
+					<h2 class="section-title">Item Details</h2>
+					<div class="details-grid">
+						<div class="detail-item">
+							<span class="detail-label">Category</span>
+							<span class="detail-value">{item.category}</span>
+						</div>
+						<div class="detail-item">
+							<span class="detail-label">Location</span>
+							<span class="detail-value">{item.location || 'No location specified'}</span>
+						</div>
+						<div class="detail-item">
+							<span class="detail-label">Floor</span>
+							<span class="detail-value">{item.floor || 'Not specified'}</span>
+						</div>
+						<div class="detail-item">
+							<span class="detail-label">Room Number</span>
+							<span class="detail-value">{item.room_number || 'Not specified'}</span>
+						</div>
 					</div>
 				</div>
 
-				<div class="grid grid-cols-1 grid-cols-md-3 gap-4 mb-4">
-					<div style="grid-column: span 2;">
-						<div class="mb-3">
-							<h2 class="mb-2">Description</h2>
-							<p>{item.description || 'No description provided.'}</p>
-						</div>
-
-						<div class="grid grid-cols-1 grid-cols-md-2 gap-4 mb-3">
-							<div>
-								<h3 class="mb-1">Category</h3>
-								<p>{item.category}</p>
-							</div>
-							<div>
-								<h3 class="mb-1">Location</h3>
-								<p>{item.location || 'No location specified'}</p>
-							</div>
-							<div>
-								<h3 class="mb-1">Floor</h3>
-								<p>{item.floor || 'Not specified'}</p>
-							</div>
-							<div>
-								<h3 class="mb-1">Room Number</h3>
-								<p>{item.room_number || 'Not specified'}</p>
-							</div>
+				{#if item.image_url}
+					<div class="item-section">
+						<h2 class="section-title">Image</h2>
+						<div class="item-image-container">
+							<button
+								class="image-button"
+								on:click={openImageModal}
+								aria-label="View full-size image"
+							>
+								<img
+									src={item.image_url}
+									alt={item.title}
+									class="item-image"
+								/>
+								<div class="image-zoom-icon">
+									<span class="material-icons">zoom_in</span>
+								</div>
+							</button>
 						</div>
 					</div>
 
-					<div class="card p-3" style="background-color: #f9fafb;">
-						<h3 class="mb-3">Contact Information</h3>
+					<!-- Image Modal/Lightbox -->
+					{#if showImageModal}
+						<div
+							class="image-modal-overlay active"
+							on:click={handleModalClick}
+							on:keydown={event => event.key === 'Escape' && closeImageModal()}
+							role="dialog"
+							aria-modal="true"
+							aria-label="Image preview"
+							tabindex="-1"
+						>
+							<div class="image-modal-content">
+								<button
+									class="modal-close-btn"
+									on:click={closeImageModal}
+									aria-label="Close image preview"
+								>
+									<span class="material-icons">close</span>
+								</button>
+								<img
+									src={item.image_url}
+									alt={item.title}
+									class="modal-image"
+								/>
+								<div class="modal-image-title">{item.title}</div>
+							</div>
+						</div>
+					{/if}
+				{/if}
+
+				<div class="item-section">
+					<div class="contact-card">
+						<h2 class="contact-title">Contact Information</h2>
 						{#if showContactInfo}
-							<div>
-								<div class="mb-2">
-									<span style="display: block; font-size: 0.875rem;">Name</span>
-									<span style="font-weight: 500;">{item.reporter_name}</span>
+							<div class="contact-info">
+								<div class="contact-item">
+									<span class="contact-label">Name</span>
+									<span class="contact-value">{item.reporter_name}</span>
 								</div>
-								<div class="mb-2">
-									<span style="display: block; font-size: 0.875rem;">Email</span>
-									<a href={`mailto:${item.reporter_email}`} style="font-weight: 500;">
-										{item.reporter_email}
-									</a>
+								<div class="contact-item">
+									<span class="contact-label">Email</span>
+									<span class="contact-value">
+										<a href={`mailto:${item.reporter_email}`}>
+											{item.reporter_email}
+										</a>
+									</span>
 								</div>
 								{#if item.reporter_phone}
-									<div class="mb-2">
-										<span style="display: block; font-size: 0.875rem;">Phone</span>
-										<a href={`tel:${item.reporter_phone}`} style="font-weight: 500;">
-											{item.reporter_phone}
-										</a>
+									<div class="contact-item">
+										<span class="contact-label">Phone</span>
+										<span class="contact-value">
+											<a href={`tel:${item.reporter_phone}`}>
+												{item.reporter_phone}
+											</a>
+										</span>
 									</div>
 								{/if}
 								{#if item.student_id}
-									<div class="mb-2">
-										<span style="display: block; font-size: 0.875rem;">Student ID</span>
-										<span style="font-weight: 500;">{item.student_id}</span>
+									<div class="contact-item">
+										<span class="contact-label">Student ID</span>
+										<span class="contact-value">{item.student_id}</span>
 									</div>
 								{/if}
-								<button
-									class="btn w-full mt-2"
-									on:click={toggleContactInfo}
-								>
-									Hide Contact Info
-								</button>
 							</div>
-						{:else}
-							<p class="mb-3">Contact information is hidden to protect privacy.</p>
 							<button
-								class="btn btn-primary w-full"
+								class="toggle-button secondary"
+								on:click={toggleContactInfo}
+							>
+								Hide Contact Info
+							</button>
+						{:else}
+							<p class="contact-info">Contact information is hidden to protect privacy.</p>
+							<button
+								class="toggle-button primary"
 								on:click={toggleContactInfo}
 							>
 								Show Contact Info
@@ -147,17 +232,6 @@
 						{/if}
 					</div>
 				</div>
-
-				{#if item.image_url}
-					<div class="mb-4">
-						<h3 class="mb-2">Image</h3>
-						<img
-							src={item.image_url}
-							alt={item.title}
-							style="max-width: 100%; height: auto; border-radius: 0.5rem; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);"
-						/>
-					</div>
-				{/if}
 			</div>
 		</div>
 	{/if}

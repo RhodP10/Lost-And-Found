@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Item } from '$lib/types';
+	import './recent-items.css';
 
 	let recentItems: Item[] = [];
 	let isLoading = true;
@@ -39,72 +40,89 @@
 		</div>
 	</section>
 
-	<section class="mb-5">
-		<h2 class="mb-3">Recent Items</h2>
+	<section class="recent-items-section mb-5">
+		<div class="section-header">
+			<h2 class="section-title">Recent Items</h2>
+			<div class="section-line"></div>
+		</div>
 
 		{#if isLoading}
-			<div class="text-center p-4">
+			<div class="loading-container">
+				<div class="loading-spinner"></div>
 				<p>Loading recent items...</p>
 			</div>
 		{:else if error}
-			<div class="text-center p-4">
-				<p style="color: red;">{error}</p>
+			<div class="error-container">
+				<div class="error-icon">
+					<span class="material-icons">error</span>
+				</div>
+				<p>{error}</p>
 			</div>
 		{:else if recentItems.length === 0}
-			<div class="text-center p-4 card">
+			<div class="empty-container">
+				<div class="empty-icon">
+					<span class="material-icons">inventory_2</span>
+				</div>
 				<p>No items have been reported yet.</p>
 			</div>
 		{:else}
-			<div class="grid grid-cols-1 grid-cols-md-2 grid-cols-lg-3 gap-6">
+			<div class="items-grid">
 				{#each recentItems as item}
-					<div class="card" style="display: flex; flex-direction: column; height: 100%;">
-						{#if item.image_url}
-							<div style="height: 180px; overflow: hidden; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
+					<div class="item-card">
+						<div class="item-status-ribbon {item.status === 'lost' ? 'lost' : 'found'}">
+							{item.status === 'lost' ? 'Lost' : 'Found'}
+						</div>
+						<div class="item-image-container">
+							{#if item.image_url}
 								<img
 									src={item.image_url}
 									alt={item.title}
-									style="width: 100%; height: 100%; object-fit: cover;"
+									class="item-image"
 								/>
-							</div>
-						{:else}
-							<div style="height: 180px; background-color: #f3f4f6; display: flex; align-items: center; justify-content: center; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem;">
-								<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" style="color: #d1d5db;">
-									<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-									<circle cx="8.5" cy="8.5" r="1.5"></circle>
-									<polyline points="21 15 16 10 5 21"></polyline>
-								</svg>
-							</div>
-						{/if}
-						<div class="card-body" style="flex: 1;">
-							<span class="badge {item.status === 'lost' ? 'badge-lost' : 'badge-found'} mb-2">
-								{item.status === 'lost' ? 'Lost' : 'Found'}
-							</span>
-							<h3 class="mb-2">{item.title}</h3>
-							<p class="mb-2">
-								<span style="font-weight: 500;">Category:</span> {item.category}
-							</p>
-							{#if item.location}
-								<p class="mb-2">
-									<span style="font-weight: 500;">Location:</span> {item.location}
-								</p>
+							{:else}
+								<div class="item-image-placeholder">
+									<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+										<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+										<circle cx="8.5" cy="8.5" r="1.5"></circle>
+										<polyline points="21 15 16 10 5 21"></polyline>
+									</svg>
+								</div>
 							{/if}
-							{#if item.floor}
-								<p class="mb-2">
-									<span style="font-weight: 500;">Floor:</span> {item.floor}
-								</p>
-							{/if}
-							{#if item.room_number}
-								<p class="mb-2">
-									<span style="font-weight: 500;">Room:</span> {item.room_number}
-								</p>
-							{/if}
-							<p>
-								<span style="font-weight: 500;">Reported:</span> {new Date(item.date_reported || '').toLocaleDateString()}
-							</p>
 						</div>
-						<div class="card-footer" style="margin-top: auto;">
-							<a href="/items/{item.id}">
-								View Details →
+						<div class="item-content">
+							<h3 class="item-title">{item.title}</h3>
+							<div class="item-details">
+								<div class="item-detail">
+									<span class="detail-label">Category:</span>
+									<span class="detail-value">{item.category}</span>
+								</div>
+								{#if item.location}
+									<div class="item-detail">
+										<span class="detail-label">Location:</span>
+										<span class="detail-value">{item.location}</span>
+									</div>
+								{/if}
+								{#if item.floor}
+									<div class="item-detail">
+										<span class="detail-label">Floor:</span>
+										<span class="detail-value">{item.floor}</span>
+									</div>
+								{/if}
+								{#if item.room_number}
+									<div class="item-detail">
+										<span class="detail-label">Room:</span>
+										<span class="detail-value">{item.room_number}</span>
+									</div>
+								{/if}
+								<div class="item-detail">
+									<span class="detail-label">Reported:</span>
+									<span class="detail-value">{new Date(item.date_reported || '').toLocaleDateString()}</span>
+								</div>
+							</div>
+						</div>
+						<div class="item-footer">
+							<a href="/items/{item.id}" class="view-details-btn">
+								View Details <span class="material-icons">arrow_forward</span>
 							</a>
 						</div>
 					</div>
