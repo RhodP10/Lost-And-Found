@@ -13,7 +13,18 @@
   // Modal states
   let showAddAdminModal = $state(false);
   let showRemoveAdminModal = $state(false);
+  let showViewUserModal = $state(false);
+  let showEditUserModal = $state(false);
+  let showDeleteUserModal = $state(false);
   let selectedUser = $state<any>(null);
+
+  // Edit user form data
+  let editUserForm = $state<any>({
+    username: '',
+    email: '',
+    full_name: '',
+    password: ''
+  });
 
   // Error and success messages
   let errorMessage = $state('');
@@ -101,11 +112,166 @@
     successMessage = '';
   }
 
+  // Open view user modal
+  function openViewUserModal(user: any): void {
+    selectedUser = user;
+    showViewUserModal = true;
+    // Clear any previous messages
+    errorMessage = '';
+    successMessage = '';
+  }
+
+  // Open edit user modal
+  function openEditUserModal(user: any): void {
+    selectedUser = user;
+    // Initialize form with user data
+    editUserForm = {
+      username: user.username,
+      email: user.email,
+      full_name: user.full_name || '',
+      password: '' // Don't populate password for security
+    };
+    showEditUserModal = true;
+    // Clear any previous messages
+    errorMessage = '';
+    successMessage = '';
+  }
+
+  // Open delete user modal
+  function openDeleteUserModal(user: any): void {
+    selectedUser = user;
+    showDeleteUserModal = true;
+    // Clear any previous messages
+    errorMessage = '';
+    successMessage = '';
+  }
+
   // Close modals
   function closeModals(): void {
     showAddAdminModal = false;
     showRemoveAdminModal = false;
+    showViewUserModal = false;
+    showEditUserModal = false;
+    showDeleteUserModal = false;
     selectedUser = null;
+  }
+
+  // Edit user
+  async function editUser(): Promise<void> {
+    if (!selectedUser) return;
+
+    try {
+      console.log('Editing user:', selectedUser.id, selectedUser.username);
+
+      // Store username for success message
+      const username = editUserForm.username;
+      const userId = selectedUser.id;
+
+      // Call API to update user
+      const response = await fetch(`/api/admin/users?id=${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editUserForm)
+      });
+
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      // Check if the response status is in the success range (200-299)
+      if (response.ok) {
+        console.log('Edit successful, updating UI');
+        // Update user in the list
+        users = users.map(user =>
+          user.id === data.user.id ? data.user : user
+        );
+
+        // Close modal
+        closeModals();
+
+        // Show success message
+        successMessage = `User ${username} has been updated successfully.`;
+        setTimeout(() => { successMessage = ''; }, 5000);
+      } else {
+        errorMessage = data.error || 'Failed to update user';
+        console.error('Error updating user:', data.error);
+
+        // Close modal after a short delay
+        setTimeout(() => {
+          closeModals();
+        }, 1000);
+      }
+    } catch (error) {
+      errorMessage = 'Failed to update user';
+      console.error('Error updating user:', error);
+
+      // Close modal after a short delay
+      setTimeout(() => {
+        closeModals();
+      }, 1000);
+    }
+  }
+
+  // Delete user
+  async function deleteUser(): Promise<void> {
+    if (!selectedUser) return;
+
+    try {
+      console.log('Deleting user:', selectedUser.id, selectedUser.username);
+
+      // Store username for success message
+      const username = selectedUser.username;
+      const userId = selectedUser.id;
+
+      // Call API to delete user
+      const url = `/api/admin/users?id=${userId}`;
+      console.log('DELETE request to:', url);
+
+      const response = await fetch(url, {
+        method: 'DELETE'
+      });
+
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      // Check if the response status is in the success range (200-299)
+      if (response.ok) {
+        console.log('Delete successful, updating UI');
+        // Remove user from the list
+        users = users.filter(user => user.id !== userId);
+
+        // If user was an admin, also remove from admins list
+        if (isUserAdmin(userId)) {
+          admins = admins.filter(admin => admin.user_id !== userId);
+        }
+
+        // Close modal
+        closeModals();
+
+        // Show success message
+        successMessage = `User ${username} has been deleted successfully.`;
+        setTimeout(() => { successMessage = ''; }, 5000);
+      } else {
+        errorMessage = data.error || 'Failed to delete user';
+        console.error('Error deleting user:', data.error);
+
+        // Close modal after a short delay
+        setTimeout(() => {
+          closeModals();
+        }, 1000);
+      }
+    } catch (error) {
+      errorMessage = 'Failed to delete user';
+      console.error('Error deleting user:', error);
+
+      // Close modal after a short delay
+      setTimeout(() => {
+        closeModals();
+      }, 1000);
+    }
   }
 
   // Add admin
@@ -113,6 +279,12 @@
     if (!selectedUser) return;
 
     try {
+      console.log('Adding admin:', selectedUser.id, selectedUser.username);
+
+      // Store username for success message
+      const username = selectedUser.username;
+      const userId = selectedUser.id;
+
       // Call API to add admin
       const response = await fetch('/api/admin/admins', {
         method: 'POST',
@@ -120,14 +292,18 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          user_id: selectedUser.id,
+          user_id: userId,
           role: 'admin'
         })
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
 
-      if (data.success) {
+      // Check if the response status is in the success range (200-299)
+      if (response.ok) {
+        console.log('Add admin successful, updating UI');
         // Refresh admins list
         await fetchAdmins();
 
@@ -135,15 +311,25 @@
         closeModals();
 
         // Show success message
-        successMessage = `${selectedUser.username} has been added as an admin.`;
+        successMessage = `${username} has been added as an admin.`;
         setTimeout(() => { successMessage = ''; }, 5000);
       } else {
         errorMessage = data.error || 'Failed to add admin';
         console.error('Error adding admin:', data.error);
+
+        // Close modal after a short delay
+        setTimeout(() => {
+          closeModals();
+        }, 1000);
       }
     } catch (error) {
       errorMessage = 'Failed to add admin';
       console.error('Error adding admin:', error);
+
+      // Close modal after a short delay
+      setTimeout(() => {
+        closeModals();
+      }, 1000);
     }
   }
 
@@ -152,14 +338,27 @@
     if (!selectedUser) return;
 
     try {
+      console.log('Removing admin:', selectedUser.id, selectedUser.username);
+
+      // Store username for success message
+      const username = selectedUser.username;
+      const userId = selectedUser.id;
+
       // Call API to remove admin
-      const response = await fetch(`/api/admin/admins?user_id=${selectedUser.id}`, {
+      const url = `/api/admin/admins?user_id=${userId}`;
+      console.log('DELETE request to:', url);
+
+      const response = await fetch(url, {
         method: 'DELETE'
       });
 
+      console.log('Response status:', response.status);
       const data = await response.json();
+      console.log('Response data:', data);
 
-      if (data.success) {
+      // Check if the response status is in the success range (200-299)
+      if (response.ok) {
+        console.log('Remove admin successful, updating UI');
         // Refresh admins list
         await fetchAdmins();
 
@@ -167,15 +366,25 @@
         closeModals();
 
         // Show success message
-        successMessage = `Admin status has been removed from ${selectedUser.username}.`;
+        successMessage = `Admin status has been removed from ${username}.`;
         setTimeout(() => { successMessage = ''; }, 5000);
       } else {
         errorMessage = data.error || 'Failed to remove admin';
         console.error('Error removing admin:', data.error);
+
+        // Close modal after a short delay
+        setTimeout(() => {
+          closeModals();
+        }, 1000);
       }
     } catch (error) {
       errorMessage = 'Failed to remove admin';
       console.error('Error removing admin:', error);
+
+      // Close modal after a short delay
+      setTimeout(() => {
+        closeModals();
+      }, 1000);
     }
   }
 </script>
@@ -238,11 +447,26 @@
                 </td>
                 <td>
                   <div class="action-buttons">
-                    <button class="action-btn view-btn" title="View User">
+                    <button
+                      class="action-btn view-btn"
+                      title="View User"
+                      onclick={() => openViewUserModal(user)}
+                    >
                       <span class="material-icons">visibility</span>
                     </button>
-                    <button class="action-btn edit-btn" title="Edit User">
+                    <button
+                      class="action-btn edit-btn"
+                      title="Edit User"
+                      onclick={() => openEditUserModal(user)}
+                    >
                       <span class="material-icons">edit</span>
+                    </button>
+                    <button
+                      class="action-btn delete-btn"
+                      title="Delete User"
+                      onclick={() => openDeleteUserModal(user)}
+                    >
+                      <span class="material-icons">delete</span>
                     </button>
                     {#if isUserAdmin(user.id)}
                       <button
@@ -357,6 +581,143 @@
         <div class="modal-footer">
           <button class="cancel-btn" onclick={closeModals}>Cancel</button>
           <button class="confirm-btn delete" onclick={removeAdmin}>Remove Admin</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- View User Modal -->
+  {#if showViewUserModal && selectedUser}
+    <div class="modal-overlay" onclick={closeModals} role="dialog" aria-modal="true">
+      <div class="modal modal-large" onclick={e => e.stopPropagation()} role="document">
+        <div class="modal-header">
+          <h3>User Details</h3>
+          <button class="close-btn" onclick={closeModals}>
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="user-details">
+            <div class="detail-row">
+              <div class="detail-label">ID:</div>
+              <div class="detail-value">{selectedUser.id}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Username:</div>
+              <div class="detail-value">{selectedUser.username}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Email:</div>
+              <div class="detail-value">{selectedUser.email}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Full Name:</div>
+              <div class="detail-value">{selectedUser.full_name || '-'}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Admin Status:</div>
+              <div class="detail-value">
+                {#if isUserAdmin(selectedUser.id)}
+                  <span class="badge badge-admin">Admin</span>
+                {:else}
+                  <span class="badge badge-user">User</span>
+                {/if}
+              </div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Created:</div>
+              <div class="detail-value">{formatDate(selectedUser.created_at)}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Last Updated:</div>
+              <div class="detail-value">{selectedUser.updated_at ? formatDate(selectedUser.updated_at) : '-'}</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" onclick={closeModals}>Close</button>
+          <button class="confirm-btn" onclick={() => { closeModals(); openEditUserModal(selectedUser); }}>Edit User</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Edit User Modal -->
+  {#if showEditUserModal && selectedUser}
+    <div class="modal-overlay" onclick={closeModals} role="dialog" aria-modal="true">
+      <div class="modal modal-large" onclick={e => e.stopPropagation()} role="document">
+        <div class="modal-header">
+          <h3>Edit User</h3>
+          <button class="close-btn" onclick={closeModals}>
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <form class="edit-user-form" onsubmit={e => e.preventDefault()}>
+            <div class="form-group">
+              <label for="username">Username</label>
+              <input
+                type="text"
+                id="username"
+                bind:value={editUserForm.username}
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input
+                type="email"
+                id="email"
+                bind:value={editUserForm.email}
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="full_name">Full Name</label>
+              <input
+                type="text"
+                id="full_name"
+                bind:value={editUserForm.full_name}
+              />
+            </div>
+            <div class="form-group">
+              <label for="password">Password (leave blank to keep current)</label>
+              <input
+                type="password"
+                id="password"
+                bind:value={editUserForm.password}
+              />
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" onclick={closeModals}>Cancel</button>
+          <button class="confirm-btn" onclick={editUser}>Save Changes</button>
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Delete User Modal -->
+  {#if showDeleteUserModal && selectedUser}
+    <div class="modal-overlay" onclick={closeModals} role="dialog" aria-modal="true">
+      <div class="modal" onclick={e => e.stopPropagation()} role="document">
+        <div class="modal-header">
+          <h3>Delete User</h3>
+          <button class="close-btn" onclick={closeModals}>
+            <span class="material-icons">close</span>
+          </button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete user <strong>{selectedUser.username}</strong>?</p>
+          <p class="modal-info warning">This action cannot be undone. All data associated with this user will be permanently deleted.</p>
+          {#if isUserAdmin(selectedUser.id)}
+            <p class="modal-info warning">This user is an administrator. Deleting this user will also remove their admin status.</p>
+          {/if}
+        </div>
+        <div class="modal-footer">
+          <button class="cancel-btn" onclick={closeModals}>Cancel</button>
+          <button class="confirm-btn delete" onclick={deleteUser}>Delete User</button>
         </div>
       </div>
     </div>
@@ -504,6 +865,81 @@
 
   .remove-admin-btn:hover {
     background-color: #ffcdd2;
+  }
+
+  .delete-btn {
+    background-color: #ffebee;
+    color: #f44336;
+  }
+
+  .delete-btn:hover {
+    background-color: #ffcdd2;
+  }
+
+  /* User Details Styles */
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .detail-row {
+    display: flex;
+    border-bottom: 1px solid #ecf0f1;
+    padding-bottom: 0.75rem;
+  }
+
+  .detail-label {
+    width: 150px;
+    font-weight: 600;
+    color: #2c3e50;
+  }
+
+  .detail-value {
+    flex: 1;
+  }
+
+  /* Form Styles */
+  .edit-user-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-group label {
+    font-weight: 600;
+    color: #2c3e50;
+  }
+
+  .form-group input {
+    padding: 0.75rem;
+    border: 1px solid #dfe6e9;
+    border-radius: 0.25rem;
+    font-size: 1rem;
+  }
+
+  .form-group input:focus {
+    border-color: #D98324;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(217, 131, 36, 0.2);
+  }
+
+  /* Modal Size Variants */
+  .modal-large {
+    max-width: 600px;
+  }
+
+  /* Warning Styles */
+  .modal-info.warning {
+    background-color: #fff3e0;
+    color: #e65100;
+    border-color: #ffe0b2;
   }
 
   /* Modal Styles */
