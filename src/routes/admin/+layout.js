@@ -1,6 +1,7 @@
 // This file ensures that the admin layout is properly loaded
-export function load() {
+export function load({ url }) {
   return {
-    admin: true
+    admin: true,
+    pathname: url.pathname
   };
 }

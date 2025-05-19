@@ -2,7 +2,7 @@
   import { authStore } from '$lib/stores/auth';
 
   // Get the children prop
-  let { children } = $props();
+  let { children, data } = $props();
 
   // Get user from auth store
   let user = $derived($authStore);
@@ -15,8 +15,26 @@
     { path: '/admin/categories', label: 'Categories', icon: 'category' }
   ];
 
-  // Get current path
-  let currentPath = $state(typeof window !== 'undefined' ? window.location.pathname : '');
+  // Get current path from page data
+  let currentPath = $derived(data.pathname);
+
+  // Update page title based on current path
+  let pageTitle = $state('Admin Dashboard');
+
+  $effect(() => {
+    // Update page title based on current path
+    if (currentPath.includes('/dashboard')) {
+      pageTitle = 'Admin Dashboard';
+    } else if (currentPath.includes('/users')) {
+      pageTitle = 'User Management';
+    } else if (currentPath.includes('/items')) {
+      pageTitle = 'Item Management';
+    } else if (currentPath.includes('/categories')) {
+      pageTitle = 'Category Management';
+    } else {
+      pageTitle = 'Admin Dashboard';
+    }
+  });
 
   // Handle logout
   function handleLogout() {
@@ -27,7 +45,7 @@
 
 <svelte:head>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <title>Admin Dashboard</title>
+  <title>{pageTitle} | Admin Panel</title>
 </svelte:head>
 
 <div class="admin-layout">
@@ -77,7 +95,7 @@
 
   <div class="main-content">
     <header class="header">
-      <h1>Admin Dashboard</h1>
+      <h1>{pageTitle}</h1>
       <div class="user-actions">
         <span>Welcome, {user ? user.username : 'Guest'}</span>
         <button class="logout-btn-small" onclick={handleLogout}>Logout</button>
