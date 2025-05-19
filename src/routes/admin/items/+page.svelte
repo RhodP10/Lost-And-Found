@@ -20,6 +20,30 @@
   let itemsPerPage = $state(10);
   let totalItems = $state(0);
 
+  // Modal states
+  let showViewItemModal = $state(false);
+  let showEditItemModal = $state(false);
+  let showDeleteItemModal = $state(false);
+  let selectedItem = $state<any>(null);
+
+  // Edit item form data
+  let editItemForm = $state<any>({
+    title: '',
+    description: '',
+    category: '',
+    status: '',
+    location: '',
+    floor: '',
+    room_number: '',
+    reporter_name: '',
+    reporter_email: '',
+    reporter_phone: ''
+  });
+
+  // Error and success messages
+  let errorMessage = $state('');
+  let successMessage = $state('');
+
   // Computed properties
   let filteredItems = $derived(filterItems(items));
   let paginatedItems = $derived(paginateItems(filteredItems));
@@ -84,6 +108,172 @@
       }
     } catch (error) {
       console.error('Error fetching categories:', error);
+    }
+  }
+
+  // Open view item modal
+  function openViewItemModal(item: any): void {
+    selectedItem = item;
+    showViewItemModal = true;
+    // Clear any previous messages
+    errorMessage = '';
+    successMessage = '';
+  }
+
+  // Open edit item modal
+  function openEditItemModal(item: any): void {
+    selectedItem = item;
+    // Initialize form with item data
+    editItemForm = {
+      title: item.title,
+      description: item.description || '',
+      category: item.category,
+      status: item.status,
+      location: item.location || '',
+      floor: item.floor || '',
+      room_number: item.room_number || '',
+      reporter_name: item.reporter_name,
+      reporter_email: item.reporter_email,
+      reporter_phone: item.reporter_phone || ''
+    };
+    showEditItemModal = true;
+    // Clear any previous messages
+    errorMessage = '';
+    successMessage = '';
+  }
+
+  // Open delete item modal
+  function openDeleteItemModal(item: any): void {
+    selectedItem = item;
+    showDeleteItemModal = true;
+    // Clear any previous messages
+    errorMessage = '';
+    successMessage = '';
+  }
+
+  // Close modals
+  function closeModals(): void {
+    showViewItemModal = false;
+    showEditItemModal = false;
+    showDeleteItemModal = false;
+    selectedItem = null;
+  }
+
+  // Edit item
+  async function editItem(): Promise<void> {
+    if (!selectedItem) return;
+
+    try {
+      console.log('Editing item:', selectedItem.id, selectedItem.title);
+
+      // Store title for success message
+      const title = editItemForm.title;
+      const itemId = selectedItem.id;
+
+      // Call API to update item
+      const response = await fetch(`/api/admin/items?id=${itemId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editItemForm)
+      });
+
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      // Check if the response status is in the success range (200-299)
+      if (response.ok) {
+        console.log('Edit successful, updating UI');
+
+        // Update item in the list
+        items = items.map(item =>
+          item.id === data.item.id ? data.item : item
+        );
+
+        // Close modal
+        closeModals();
+
+        // Show success message
+        successMessage = `Item "${title}" has been updated successfully.`;
+        setTimeout(() => { successMessage = ''; }, 5000);
+      } else {
+        errorMessage = data.error || 'Failed to update item';
+        console.error('Error updating item:', data.error);
+
+        // Close modal after a short delay
+        setTimeout(() => {
+          closeModals();
+        }, 1000);
+      }
+    } catch (error) {
+      errorMessage = 'Failed to update item';
+      console.error('Error updating item:', error);
+
+      // Close modal after a short delay
+      setTimeout(() => {
+        closeModals();
+      }, 1000);
+    }
+  }
+
+  // Delete item
+  async function deleteItem(): Promise<void> {
+    if (!selectedItem) return;
+
+    try {
+      console.log('Deleting item:', selectedItem.id, selectedItem.title);
+
+      // Store title for success message
+      const title = selectedItem.title;
+      const itemId = selectedItem.id;
+
+      // Call API to delete item
+      const url = `/api/admin/items?id=${itemId}`;
+      console.log('DELETE request to:', url);
+
+      const response = await fetch(url, {
+        method: 'DELETE'
+      });
+
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      // Check if the response status is in the success range (200-299)
+      if (response.ok) {
+        console.log('Delete successful, updating UI');
+
+        // Remove item from the list
+        items = items.filter(item => item.id !== itemId);
+
+        // Update total items count
+        totalItems = items.length;
+
+        // Close modal
+        closeModals();
+
+        // Show success message
+        successMessage = `Item "${title}" has been deleted successfully.`;
+        setTimeout(() => { successMessage = ''; }, 5000);
+      } else {
+        errorMessage = data.error || 'Failed to delete item';
+        console.error('Error deleting item:', data.error);
+
+        // Close modal after a short delay
+        setTimeout(() => {
+          closeModals();
+        }, 1000);
+      }
+    } catch (error) {
+      errorMessage = 'Failed to delete item';
+      console.error('Error deleting item:', error);
+
+      // Close modal after a short delay
+      setTimeout(() => {
+        closeModals();
+      }, 1000);
     }
   }
 
@@ -162,6 +352,22 @@
 </script>
 
 <div class="admin-items">
+  {#if errorMessage}
+    <div class="alert alert-error">
+      <span class="material-icons">error</span>
+      <span>{errorMessage}</span>
+      <button class="close-alert" onclick={() => errorMessage = ''}>×</button>
+    </div>
+  {/if}
+
+  {#if successMessage}
+    <div class="alert alert-success">
+      <span class="material-icons">check_circle</span>
+      <span>{successMessage}</span>
+      <button class="close-alert" onclick={() => successMessage = ''}>×</button>
+    </div>
+  {/if}
+
   {#if isLoading}
     <div class="loading">
       <p>Loading items data...</p>
@@ -267,13 +473,25 @@
                 <td>{formatDate(item.date_reported)}</td>
                 <td>
                   <div class="action-buttons">
-                    <button class="action-btn view-btn" title="View Item">
+                    <button
+                      class="action-btn view-btn"
+                      title="View Item"
+                      onclick={() => openViewItemModal(item)}
+                    >
                       <span class="material-icons">visibility</span>
                     </button>
-                    <button class="action-btn edit-btn" title="Edit Item">
+                    <button
+                      class="action-btn edit-btn"
+                      title="Edit Item"
+                      onclick={() => openEditItemModal(item)}
+                    >
                       <span class="material-icons">edit</span>
                     </button>
-                    <button class="action-btn delete-btn" title="Delete Item">
+                    <button
+                      class="action-btn delete-btn"
+                      title="Delete Item"
+                      onclick={() => openDeleteItemModal(item)}
+                    >
                       <span class="material-icons">delete</span>
                     </button>
                   </div>
@@ -339,6 +557,223 @@
         </div>
       {/if}
     </div>
+
+    <!-- View Item Modal -->
+    {#if showViewItemModal && selectedItem}
+      <div class="modal-overlay" onclick={closeModals} role="dialog" aria-modal="true">
+        <div class="modal modal-large" onclick={e => e.stopPropagation()} role="document">
+          <div class="modal-header">
+            <h3>Item Details</h3>
+            <button class="close-btn" onclick={closeModals}>
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="item-details">
+              <div class="detail-row">
+                <div class="detail-label">ID:</div>
+                <div class="detail-value">{selectedItem.id}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Title:</div>
+                <div class="detail-value">{selectedItem.title}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Description:</div>
+                <div class="detail-value">{selectedItem.description || '-'}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Category:</div>
+                <div class="detail-value">{selectedItem.category}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Status:</div>
+                <div class="detail-value">
+                  <span class="badge {getStatusBadgeClass(selectedItem.status)}">
+                    {selectedItem.status}
+                  </span>
+                </div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Location:</div>
+                <div class="detail-value">{selectedItem.location || '-'}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Floor:</div>
+                <div class="detail-value">{selectedItem.floor || '-'}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Room Number:</div>
+                <div class="detail-value">{selectedItem.room_number || '-'}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Reporter Name:</div>
+                <div class="detail-value">{selectedItem.reporter_name}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Reporter Email:</div>
+                <div class="detail-value">{selectedItem.reporter_email}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Reporter Phone:</div>
+                <div class="detail-value">{selectedItem.reporter_phone || '-'}</div>
+              </div>
+              <div class="detail-row">
+                <div class="detail-label">Date Reported:</div>
+                <div class="detail-value">{formatDate(selectedItem.date_reported || selectedItem.created_at)}</div>
+              </div>
+              {#if selectedItem.image_url}
+                <div class="detail-row">
+                  <div class="detail-label">Image:</div>
+                  <div class="detail-value">
+                    <img src={selectedItem.image_url} alt={selectedItem.title} class="item-image" />
+                  </div>
+                </div>
+              {/if}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="cancel-btn" onclick={closeModals}>Close</button>
+            <button class="confirm-btn" onclick={() => { closeModals(); openEditItemModal(selectedItem); }}>Edit Item</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Edit Item Modal -->
+    {#if showEditItemModal && selectedItem}
+      <div class="modal-overlay" onclick={closeModals} role="dialog" aria-modal="true">
+        <div class="modal modal-large" onclick={e => e.stopPropagation()} role="document">
+          <div class="modal-header">
+            <h3>Edit Item</h3>
+            <button class="close-btn" onclick={closeModals}>
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form class="edit-item-form" onsubmit={e => e.preventDefault()}>
+              <div class="form-group">
+                <label for="title">Title</label>
+                <input
+                  type="text"
+                  id="title"
+                  bind:value={editItemForm.title}
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="description">Description</label>
+                <textarea
+                  id="description"
+                  bind:value={editItemForm.description}
+                  rows="3"
+                ></textarea>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="category">Category</label>
+                  <select id="category" bind:value={editItemForm.category} required>
+                    <option value="">Select Category</option>
+                    {#each categories as category}
+                      <option value={category.name}>{category.name}</option>
+                    {/each}
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="status">Status</label>
+                  <select id="status" bind:value={editItemForm.status} required>
+                    <option value="">Select Status</option>
+                    <option value="lost">Lost</option>
+                    <option value="found">Found</option>
+                    <option value="claimed">Claimed</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="location">Location</label>
+                  <input
+                    type="text"
+                    id="location"
+                    bind:value={editItemForm.location}
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="floor">Floor</label>
+                  <input
+                    type="text"
+                    id="floor"
+                    bind:value={editItemForm.floor}
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="room_number">Room Number</label>
+                  <input
+                    type="text"
+                    id="room_number"
+                    bind:value={editItemForm.room_number}
+                  />
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="reporter_name">Reporter Name</label>
+                  <input
+                    type="text"
+                    id="reporter_name"
+                    bind:value={editItemForm.reporter_name}
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="reporter_email">Reporter Email</label>
+                  <input
+                    type="email"
+                    id="reporter_email"
+                    bind:value={editItemForm.reporter_email}
+                    required
+                  />
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="reporter_phone">Reporter Phone</label>
+                <input
+                  type="tel"
+                  id="reporter_phone"
+                  bind:value={editItemForm.reporter_phone}
+                />
+              </div>
+            </form>
+          </div>
+          <div class="modal-footer">
+            <button class="cancel-btn" onclick={closeModals}>Cancel</button>
+            <button class="confirm-btn" onclick={editItem}>Save Changes</button>
+          </div>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Delete Item Modal -->
+    {#if showDeleteItemModal && selectedItem}
+      <div class="modal-overlay" onclick={closeModals} role="dialog" aria-modal="true">
+        <div class="modal" onclick={e => e.stopPropagation()} role="document">
+          <div class="modal-header">
+            <h3>Delete Item</h3>
+            <button class="close-btn" onclick={closeModals}>
+              <span class="material-icons">close</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p>Are you sure you want to delete item <strong>"{selectedItem.title}"</strong>?</p>
+            <p class="modal-info warning">This action cannot be undone. All data associated with this item will be permanently deleted.</p>
+          </div>
+          <div class="modal-footer">
+            <button class="cancel-btn" onclick={closeModals}>Cancel</button>
+            <button class="confirm-btn delete" onclick={deleteItem}>Delete Item</button>
+          </div>
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -651,5 +1086,246 @@
     padding: 0 1rem;
     color: #2c3e50;
     font-size: 0.875rem;
+  }
+
+  /* Modal Styles */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+  }
+
+  .modal {
+    background-color: white;
+    border-radius: 0.5rem;
+    width: 90%;
+    max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .modal-large {
+    max-width: 700px;
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #ecf0f1;
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+  }
+
+  .close-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #7f8c8d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+  }
+
+  .close-btn:hover {
+    background-color: #f8f9fa;
+    color: #2c3e50;
+  }
+
+  .modal-body {
+    padding: 1rem;
+    overflow-y: auto;
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    padding: 1rem;
+    border-top: 1px solid #ecf0f1;
+  }
+
+  .cancel-btn, .confirm-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .cancel-btn {
+    background-color: #f8f9fa;
+    color: #2c3e50;
+    border: 1px solid #dfe6e9;
+  }
+
+  .cancel-btn:hover {
+    background-color: #ecf0f1;
+  }
+
+  .confirm-btn {
+    background-color: #D98324;
+    color: white;
+    border: none;
+  }
+
+  .confirm-btn:hover {
+    background-color: #c67620;
+  }
+
+  .confirm-btn.delete {
+    background-color: #e53e3e;
+  }
+
+  .confirm-btn.delete:hover {
+    background-color: #c53030;
+  }
+
+  /* Item Details Styles */
+  .item-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .detail-row {
+    display: flex;
+    border-bottom: 1px solid #ecf0f1;
+    padding-bottom: 0.75rem;
+  }
+
+  .detail-label {
+    width: 150px;
+    font-weight: 600;
+    color: #2c3e50;
+  }
+
+  .detail-value {
+    flex: 1;
+  }
+
+  .item-image {
+    max-width: 100%;
+    max-height: 200px;
+    border-radius: 0.25rem;
+  }
+
+  /* Form Styles */
+  .edit-item-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-row {
+    display: flex;
+    gap: 1rem;
+  }
+
+  .form-row .form-group {
+    flex: 1;
+  }
+
+  .form-group label {
+    font-weight: 600;
+    color: #2c3e50;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 0.75rem;
+    border: 1px solid #dfe6e9;
+    border-radius: 0.25rem;
+    font-size: 1rem;
+  }
+
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    border-color: #D98324;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(217, 131, 36, 0.2);
+  }
+
+  /* Modal Info */
+  .modal-info {
+    padding: 0.75rem;
+    border-radius: 0.25rem;
+    margin-top: 1rem;
+    font-size: 0.875rem;
+  }
+
+  .modal-info.warning {
+    background-color: #fff3e0;
+    color: #e65100;
+    border: 1px solid #ffe0b2;
+  }
+
+  /* Alert Styles */
+  .alert {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+
+  .alert .material-icons {
+    margin-right: 0.5rem;
+    font-size: 1.25rem;
+  }
+
+  .alert-success {
+    background-color: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+  }
+
+  .alert-error {
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+  }
+
+  .close-alert {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    font-size: 1.25rem;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+  }
+
+  .close-alert:hover {
+    opacity: 1;
   }
 </style>
