@@ -22,3 +22,12 @@ export interface Category {
   name: string;
   created_at?: string;
 }
+
+export interface Admin {
+  id: number;
+  user_id: number;
+  role: string;
+  permissions?: string;
+  created_at?: string;
+  updated_at?: string;
+}

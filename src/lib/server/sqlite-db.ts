@@ -3,6 +3,7 @@ import { dev } from '$app/environment';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import bcrypt from 'bcryptjs';
 
 // Get the directory name
 const __filename = fileURLToPath(import.meta.url);
@@ -49,6 +50,26 @@ db.exec(`
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    full_name TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS admins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    role TEXT NOT NULL DEFAULT 'admin',
+    permissions TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
 `);
 
 // Insert default categories if they don't exist
@@ -68,6 +89,54 @@ if (categoriesCount.count === 0) {
   defaultCategories.forEach(category => {
     insertCategory.run(category);
   });
+}
+
+// Create default admin user if no users exist
+
+const usersCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+if (usersCount.count === 0) {
+  // Default admin credentials
+  const adminUser = {
+    username: 'admin',
+    email: 'admin@example.com',
+    password: 'admin123', // This will be hashed
+    full_name: 'System Administrator'
+  };
+
+  // Hash the password
+  const salt = bcrypt.genSaltSync(10);
+  const hashedPassword = bcrypt.hashSync(adminUser.password, salt);
+
+  // Insert admin user
+  const insertUser = db.prepare(`
+    INSERT INTO users (username, email, password, full_name)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  const userResult = insertUser.run(
+    adminUser.username,
+    adminUser.email,
+    hashedPassword,
+    adminUser.full_name
+  );
+
+  // If user was created successfully, make them an admin
+  if (userResult.lastInsertRowid) {
+    const insertAdmin = db.prepare(`
+      INSERT INTO admins (user_id, role, permissions)
+      VALUES (?, ?, ?)
+    `);
+
+    insertAdmin.run(
+      userResult.lastInsertRowid,
+      'admin',
+      JSON.stringify({ all: true })
+    );
+
+    console.log('Default admin user created:');
+    console.log('Username: admin');
+    console.log('Password: admin123');
+  }
 }
 
 // Insert sample data in development mode

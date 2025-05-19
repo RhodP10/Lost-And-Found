@@ -51,8 +51,14 @@
 			// Store user info in the auth store
 			authStore.login(data.user);
 
-			// Redirect to dashboard
-			goto('/dashboard', { replaceState: true });
+			// Redirect to appropriate dashboard based on user role
+			if (data.user.isAdmin) {
+				console.log('Redirecting to admin dashboard');
+				goto('/admin/dashboard', { replaceState: true });
+			} else {
+				console.log('Redirecting to user dashboard');
+				goto('/account/dashboard', { replaceState: true });
+			}
 
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'An error occurred';

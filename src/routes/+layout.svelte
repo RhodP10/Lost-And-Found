@@ -197,6 +197,15 @@
 								>
 									My Dashboard
 								</a>
+								{#if user.isAdmin}
+									<a
+										href="/admin/dashboard"
+										style="margin-right: 20px; color: #D98324; text-decoration: none; font-weight: 500;"
+										class={currentPath.startsWith('/admin') ? 'font-bold' : ''}
+									>
+										Admin Panel
+									</a>
+								{/if}
 								<span style="margin-right: 20px; color: white;">
 									Hello, {user.username}
 								</span>

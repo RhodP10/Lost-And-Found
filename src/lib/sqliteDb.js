@@ -17,6 +17,66 @@ const db = new Database(dbPath);
 // Enable foreign keys
 db.pragma('foreign_keys = ON');
 
+// Create admin table if it doesn't exist
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    role TEXT NOT NULL DEFAULT 'admin',
+    permissions TEXT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+`);
+
+// Create default admin user if no users exist
+const usersCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+if (usersCount.count === 0) {
+  // Default admin credentials
+  const adminUser = {
+    username: 'admin',
+    email: 'admin@example.com',
+    password: 'admin123', // This will be hashed
+    full_name: 'System Administrator'
+  };
+
+  // Hash the password
+  const salt = bcrypt.genSaltSync(10);
+  const hashedPassword = bcrypt.hashSync(adminUser.password, salt);
+
+  // Insert admin user
+  const insertUser = db.prepare(`
+    INSERT INTO users (username, email, password, full_name)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  const userResult = insertUser.run(
+    adminUser.username,
+    adminUser.email,
+    hashedPassword,
+    adminUser.full_name
+  );
+
+  // If user was created successfully, make them an admin
+  if (userResult.lastInsertRowid) {
+    const insertAdmin = db.prepare(`
+      INSERT INTO admins (user_id, role, permissions)
+      VALUES (?, ?, ?)
+    `);
+
+    insertAdmin.run(
+      userResult.lastInsertRowid,
+      'admin',
+      JSON.stringify({ all: true })
+    );
+
+    console.log('Default admin user created:');
+    console.log('Username: admin');
+    console.log('Password: admin123');
+  }
+}
+
 // User-related functions
 export function findUserByEmail(email) {
   return db.prepare('SELECT * FROM users WHERE email = ?').get(email);
@@ -252,6 +312,129 @@ export function updateUser(id, userData) {
   return null;
 }
 
+// Admin-related functions
+export function isUserAdmin(userId) {
+  try {
+    return db.prepare('SELECT * FROM admins WHERE user_id = ?').get(userId) !== undefined;
+  } catch (error) {
+    // If the admins table doesn't exist, create it
+    if (error.message.includes('no such table')) {
+      console.log('Creating admins table...');
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS admins (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          role TEXT NOT NULL DEFAULT 'admin',
+          permissions TEXT,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+      `);
+      return false;
+    }
+    throw error;
+  }
+}
+
+export function getAdminByUserId(userId) {
+  try {
+    return db.prepare('SELECT * FROM admins WHERE user_id = ?').get(userId);
+  } catch (error) {
+    // If the admins table doesn't exist, return null
+    if (error.message.includes('no such table')) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+export function getAllAdmins() {
+  try {
+    return db.prepare(`
+      SELECT a.*, u.username, u.email, u.full_name
+      FROM admins a
+      JOIN users u ON a.user_id = u.id
+      ORDER BY a.created_at DESC
+    `).all();
+  } catch (error) {
+    // If the admins table doesn't exist, return empty array
+    if (error.message.includes('no such table')) {
+      return [];
+    }
+    throw error;
+  }
+}
+
+export function addAdmin(userId, role = 'admin', permissions = null) {
+  // Check if user exists
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  // Check if user is already an admin
+  if (isUserAdmin(userId)) {
+    throw new Error('User is already an admin');
+  }
+
+  // Add user as admin
+  const stmt = db.prepare(`
+    INSERT INTO admins (user_id, role, permissions)
+    VALUES (?, ?, ?)
+  `);
+
+  const result = stmt.run(userId, role, permissions);
+
+  if (result.lastInsertRowid) {
+    return getAdminByUserId(userId);
+  } else {
+    throw new Error('Failed to add admin');
+  }
+}
+
+export function updateAdminPermissions(adminId, permissions) {
+  const stmt = db.prepare(`
+    UPDATE admins
+    SET permissions = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  const result = stmt.run(permissions, adminId);
+
+  if (result.changes > 0) {
+    return db.prepare('SELECT * FROM admins WHERE id = ?').get(adminId);
+  }
+
+  return null;
+}
+
+export function updateAdminRole(adminId, role) {
+  const stmt = db.prepare(`
+    UPDATE admins
+    SET role = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+
+  const result = stmt.run(role, adminId);
+
+  if (result.changes > 0) {
+    return db.prepare('SELECT * FROM admins WHERE id = ?').get(adminId);
+  }
+
+  return null;
+}
+
+export function removeAdmin(adminId) {
+  const result = db.prepare('DELETE FROM admins WHERE id = ?').run(adminId);
+  return result.changes > 0;
+}
+
+export function removeAdminByUserId(userId) {
+  const result = db.prepare('DELETE FROM admins WHERE user_id = ?').run(userId);
+  return result.changes > 0;
+}
+
 export default {
   findUserByEmail,
   findUserByUsername,
@@ -264,5 +447,14 @@ export default {
   createItem,
   updateItem,
   deleteItem,
-  getCategories
+  getCategories,
+  // Admin functions
+  isUserAdmin,
+  getAdminByUserId,
+  getAllAdmins,
+  addAdmin,
+  updateAdminPermissions,
+  updateAdminRole,
+  removeAdmin,
+  removeAdminByUserId
 };

@@ -64,3 +64,17 @@ CREATE TABLE IF NOT EXISTS claims (
   FOREIGN KEY (item_id) REFERENCES items(id),
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
+
+-- Create admin table for administrative users
+CREATE TABLE IF NOT EXISTS admins (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  role TEXT NOT NULL DEFAULT 'admin',
+  permissions TEXT,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- Create index for admin user_id
+CREATE INDEX idx_admins_user_id ON admins(user_id);
