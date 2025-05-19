@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.join(__dirname, '../../database/lost_and_found.sqlite');
 
 // Create and export database connection
-const db = new Database(dbPath);
+export const db = new Database(dbPath);
 
 // Enable foreign keys
 db.pragma('foreign_keys = ON');

@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
 
   // Items list
-  let items = $state([]);
+  let items = $state<any[]>([]);
 
   // Filter states
   let statusFilter = $state('all');
@@ -10,7 +10,7 @@
   let searchQuery = $state('');
 
   // Categories list
-  let categories = $state([]);
+  let categories = $state<any[]>([]);
 
   // Loading state
   let isLoading = $state(true);
@@ -25,11 +25,21 @@
   let paginatedItems = $derived(paginateItems(filteredItems));
   let totalPages = $derived(Math.ceil(filteredItems.length / itemsPerPage));
 
+  // Watch for filter changes and refetch items
+  $effect(() => {
+    // Only refetch when filters change and not during initial loading
+    if (!isLoading && (statusFilter || categoryFilter || searchQuery)) {
+      fetchItems();
+    }
+  });
+
   onMount(async () => {
     try {
-      // Fetch items and categories
-      await fetchItems();
+      // Fetch categories first (they don't change often)
       await fetchCategories();
+
+      // Then fetch items
+      await fetchItems();
 
       isLoading = false;
     } catch (error) {
@@ -39,115 +49,46 @@
   });
 
   async function fetchItems() {
-    // In a real app, you would fetch this from an API
-    // For now, we'll use mock data
+    try {
+      // Build query parameters based on filters
+      const params = new URLSearchParams();
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      if (searchQuery) params.append('search', searchQuery);
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+      // Fetch items from API
+      const response = await fetch(`/api/admin/items?${params.toString()}`);
+      const data = await response.json();
 
-    items = [
-      {
-        id: 1,
-        title: 'iPhone 13 Pro',
-        description: 'Lost my iPhone 13 Pro with a black case. The lock screen has a picture of a dog.',
-        category: 'Electronics',
-        status: 'lost',
-        location: 'Student Center',
-        reporter_name: 'John Smith',
-        reporter_email: 'john@example.com',
-        date_reported: '2023-06-15T14:30:00Z'
-      },
-      {
-        id: 2,
-        title: 'Black Wallet',
-        description: 'Found a black leather wallet with ID and credit cards inside.',
-        category: 'Accessories',
-        status: 'found',
-        location: 'Engineering Building',
-        reporter_name: 'Sarah Wilson',
-        reporter_email: 'sarah@example.com',
-        date_reported: '2023-06-14T10:15:00Z'
-      },
-      {
-        id: 3,
-        title: 'Laptop Charger',
-        description: 'Lost my MacBook Pro charger in the computer lab.',
-        category: 'Electronics',
-        status: 'lost',
-        location: 'Computer Lab',
-        reporter_name: 'Michael Brown',
-        reporter_email: 'michael@example.com',
-        date_reported: '2023-06-13T16:45:00Z'
-      },
-      {
-        id: 4,
-        title: 'Student ID Card',
-        description: 'Found a student ID card for Emily Johnson.',
-        category: 'Documents',
-        status: 'found',
-        location: 'Main Entrance',
-        reporter_name: 'Robert Taylor',
-        reporter_email: 'robert@example.com',
-        date_reported: '2023-06-12T09:20:00Z'
-      },
-      {
-        id: 5,
-        title: 'Textbook',
-        description: 'Found a calculus textbook with the name "Jessica" written inside.',
-        category: 'Other',
-        status: 'claimed',
-        location: 'Science Building',
-        reporter_name: 'David Lee',
-        reporter_email: 'david@example.com',
-        date_reported: '2023-06-11T13:10:00Z'
-      },
-      {
-        id: 6,
-        title: 'Blue Backpack',
-        description: 'Lost my blue North Face backpack with laptop inside.',
-        category: 'Bags',
-        status: 'lost',
-        location: 'Library',
-        reporter_name: 'Jessica Miller',
-        reporter_email: 'jessica@example.com',
-        date_reported: '2023-06-10T11:05:00Z'
-      },
-      {
-        id: 7,
-        title: 'Car Keys',
-        description: 'Found a set of car keys with a Toyota key fob.',
-        category: 'Keys',
-        status: 'found',
-        location: 'Parking Lot',
-        reporter_name: 'Thomas Wilson',
-        reporter_email: 'thomas@example.com',
-        date_reported: '2023-06-09T15:30:00Z'
+      if (data.success) {
+        items = data.items;
+        totalItems = items.length;
+      } else {
+        console.error('Error fetching items:', data.error);
       }
-    ];
-
-    totalItems = items.length;
+    } catch (error) {
+      console.error('Error fetching items:', error);
+    }
   }
 
   async function fetchCategories() {
-    // In a real app, you would fetch this from an API
-    // For now, we'll use mock data
+    try {
+      // Fetch categories from API
+      const response = await fetch('/api/admin/categories');
+      const data = await response.json();
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 300));
-
-    categories = [
-      { id: 1, name: 'Electronics' },
-      { id: 2, name: 'Clothing' },
-      { id: 3, name: 'Accessories' },
-      { id: 4, name: 'Documents' },
-      { id: 5, name: 'Keys' },
-      { id: 6, name: 'Bags' },
-      { id: 7, name: 'Other' }
-    ];
+      if (data.success) {
+        categories = data.categories;
+      } else {
+        console.error('Error fetching categories:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
   }
 
   // Filter items based on status, category, and search query
-  function filterItems(items) {
+  function filterItems(items: any[]): any[] {
     return items.filter(item => {
       // Filter by status
       if (statusFilter !== 'all' && item.status !== statusFilter) {
@@ -164,9 +105,9 @@
         const query = searchQuery.toLowerCase();
         return (
           item.title.toLowerCase().includes(query) ||
-          item.description.toLowerCase().includes(query) ||
-          item.location.toLowerCase().includes(query) ||
-          item.reporter_name.toLowerCase().includes(query)
+          (item.description && item.description.toLowerCase().includes(query)) ||
+          (item.location && item.location.toLowerCase().includes(query)) ||
+          (item.reporter_name && item.reporter_name.toLowerCase().includes(query))
         );
       }
 
@@ -175,20 +116,20 @@
   }
 
   // Paginate items
-  function paginateItems(items) {
+  function paginateItems(items: any[]): any[] {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return items.slice(startIndex, endIndex);
   }
 
   // Handle page change
-  function changePage(page) {
+  function changePage(page: number): void {
     if (page < 1 || page > totalPages) return;
     currentPage = page;
   }
 
   // Reset filters
-  function resetFilters() {
+  function resetFilters(): void {
     statusFilter = 'all';
     categoryFilter = 'all';
     searchQuery = '';
@@ -196,7 +137,7 @@
   }
 
   // Format date
-  function formatDate(dateString) {
+  function formatDate(dateString: string): string {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -206,7 +147,7 @@
   }
 
   // Get status badge class
-  function getStatusBadgeClass(status) {
+  function getStatusBadgeClass(status: string): string {
     switch (status) {
       case 'lost':
         return 'badge-lost';
