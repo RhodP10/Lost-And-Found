@@ -8,9 +8,10 @@
 	let isNavigating = $state(false);
 	let user = $state(null as any);
 
-	// Check if current page is login, signup, or account page
+	// Check if current page is login, signup, account, or admin page
 	let isAuthPage = $derived(currentPath === '/login' || currentPath === '/signup');
 	let isAccountPage = $derived(currentPath.startsWith('/account'));
+	let isAdminPage = $derived(currentPath.startsWith('/admin'));
 
 	// Subscribe to auth store
 	onMount(() => {
@@ -142,6 +143,11 @@
 	</div>
 {:else if isAccountPage}
 	<!-- For account pages, render only the content without header/footer -->
+	<div style="min-height: 100vh;">
+		{@render children()}
+	</div>
+{:else if isAdminPage}
+	<!-- For admin pages, render only the content without header/footer -->
 	<div style="min-height: 100vh;">
 		{@render children()}
 	</div>

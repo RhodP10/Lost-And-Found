@@ -1,50 +1,50 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  
+
   // Items list
   let items = $state([]);
-  
+
   // Filter states
   let statusFilter = $state('all');
   let categoryFilter = $state('all');
   let searchQuery = $state('');
-  
+
   // Categories list
   let categories = $state([]);
-  
+
   // Loading state
   let isLoading = $state(true);
-  
+
   // Pagination
   let currentPage = $state(1);
   let itemsPerPage = $state(10);
   let totalItems = $state(0);
-  
+
   // Computed properties
   let filteredItems = $derived(filterItems(items));
   let paginatedItems = $derived(paginateItems(filteredItems));
   let totalPages = $derived(Math.ceil(filteredItems.length / itemsPerPage));
-  
+
   onMount(async () => {
     try {
       // Fetch items and categories
       await fetchItems();
       await fetchCategories();
-      
+
       isLoading = false;
     } catch (error) {
       console.error('Error loading items data:', error);
       isLoading = false;
     }
   });
-  
+
   async function fetchItems() {
     // In a real app, you would fetch this from an API
     // For now, we'll use mock data
-    
+
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 500));
-    
+
     items = [
       {
         id: 1,
@@ -124,17 +124,17 @@
         date_reported: '2023-06-09T15:30:00Z'
       }
     ];
-    
+
     totalItems = items.length;
   }
-  
+
   async function fetchCategories() {
     // In a real app, you would fetch this from an API
     // For now, we'll use mock data
-    
+
     // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 300));
-    
+
     categories = [
       { id: 1, name: 'Electronics' },
       { id: 2, name: 'Clothing' },
@@ -145,7 +145,7 @@
       { id: 7, name: 'Other' }
     ];
   }
-  
+
   // Filter items based on status, category, and search query
   function filterItems(items) {
     return items.filter(item => {
@@ -153,12 +153,12 @@
       if (statusFilter !== 'all' && item.status !== statusFilter) {
         return false;
       }
-      
+
       // Filter by category
       if (categoryFilter !== 'all' && item.category !== categoryFilter) {
         return false;
       }
-      
+
       // Filter by search query
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
@@ -169,24 +169,24 @@
           item.reporter_name.toLowerCase().includes(query)
         );
       }
-      
+
       return true;
     });
   }
-  
+
   // Paginate items
   function paginateItems(items) {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return items.slice(startIndex, endIndex);
   }
-  
+
   // Handle page change
   function changePage(page) {
     if (page < 1 || page > totalPages) return;
     currentPage = page;
   }
-  
+
   // Reset filters
   function resetFilters() {
     statusFilter = 'all';
@@ -194,7 +194,7 @@
     searchQuery = '';
     currentPage = 1;
   }
-  
+
   // Format date
   function formatDate(dateString) {
     const date = new Date(dateString);
@@ -204,7 +204,7 @@
       day: 'numeric'
     });
   }
-  
+
   // Get status badge class
   function getStatusBadgeClass(status) {
     switch (status) {
@@ -230,11 +230,11 @@
     <div class="filters-section">
       <div class="search-box">
         <span class="material-icons search-icon">search</span>
-        <input 
-          type="text" 
-          placeholder="Search items..." 
+        <input
+          type="text"
+          placeholder="Search items..."
           bind:value={searchQuery}
-          on:input={() => currentPage = 1}
+          oninput={() => currentPage = 1}
         />
         {#if searchQuery}
           <button class="clear-search" onclick={() => searchQuery = ''}>
@@ -242,14 +242,14 @@
           </button>
         {/if}
       </div>
-      
+
       <div class="filter-controls">
         <div class="filter-group">
           <label for="status-filter">Status:</label>
-          <select 
-            id="status-filter" 
+          <select
+            id="status-filter"
             bind:value={statusFilter}
-            on:change={() => currentPage = 1}
+            onchange={() => currentPage = 1}
           >
             <option value="all">All Statuses</option>
             <option value="lost">Lost</option>
@@ -257,13 +257,13 @@
             <option value="claimed">Claimed</option>
           </select>
         </div>
-        
+
         <div class="filter-group">
           <label for="category-filter">Category:</label>
-          <select 
-            id="category-filter" 
+          <select
+            id="category-filter"
             bind:value={categoryFilter}
-            on:change={() => currentPage = 1}
+            onchange={() => currentPage = 1}
           >
             <option value="all">All Categories</option>
             {#each categories as category}
@@ -271,14 +271,14 @@
             {/each}
           </select>
         </div>
-        
+
         <button class="reset-filters" onclick={resetFilters}>
           <span class="material-icons">refresh</span>
           Reset Filters
         </button>
       </div>
     </div>
-    
+
     <!-- Items Table -->
     <div class="items-section">
       <div class="section-header">
@@ -291,7 +291,7 @@
           </a>
         </div>
       </div>
-      
+
       <div class="table-container">
         <table class="items-table">
           <thead>
@@ -339,7 +339,7 @@
                 </td>
               </tr>
             {/each}
-            
+
             {#if paginatedItems.length === 0}
               <tr>
                 <td colspan="8" class="no-items">
@@ -356,40 +356,40 @@
           </tbody>
         </table>
       </div>
-      
+
       <!-- Pagination -->
       {#if filteredItems.length > 0}
         <div class="pagination">
-          <button 
-            class="pagination-btn" 
+          <button
+            class="pagination-btn"
             disabled={currentPage === 1}
             onclick={() => changePage(1)}
           >
             <span class="material-icons">first_page</span>
           </button>
-          
-          <button 
-            class="pagination-btn" 
+
+          <button
+            class="pagination-btn"
             disabled={currentPage === 1}
             onclick={() => changePage(currentPage - 1)}
           >
             <span class="material-icons">chevron_left</span>
           </button>
-          
+
           <div class="pagination-info">
             Page {currentPage} of {totalPages}
           </div>
-          
-          <button 
-            class="pagination-btn" 
+
+          <button
+            class="pagination-btn"
             disabled={currentPage === totalPages}
             onclick={() => changePage(currentPage + 1)}
           >
             <span class="material-icons">chevron_right</span>
           </button>
-          
-          <button 
-            class="pagination-btn" 
+
+          <button
+            class="pagination-btn"
             disabled={currentPage === totalPages}
             onclick={() => changePage(totalPages)}
           >
@@ -407,14 +407,14 @@
     flex-direction: column;
     gap: 1.5rem;
   }
-  
+
   .loading {
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 300px;
   }
-  
+
   /* Filters Section */
   .filters-section {
     background-color: white;
@@ -422,12 +422,12 @@
     padding: 1.5rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
-  
+
   .search-box {
     position: relative;
     margin-bottom: 1rem;
   }
-  
+
   .search-icon {
     position: absolute;
     left: 1rem;
@@ -435,7 +435,7 @@
     transform: translateY(-50%);
     color: #7f8c8d;
   }
-  
+
   .search-box input {
     width: 100%;
     padding: 0.75rem 1rem 0.75rem 2.5rem;
@@ -443,7 +443,7 @@
     border-radius: 0.25rem;
     font-size: 1rem;
   }
-  
+
   .clear-search {
     position: absolute;
     right: 1rem;
@@ -454,32 +454,32 @@
     color: #7f8c8d;
     cursor: pointer;
   }
-  
+
   .filter-controls {
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
     align-items: center;
   }
-  
+
   .filter-group {
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
-  
+
   .filter-group label {
     font-weight: 500;
     color: #2c3e50;
   }
-  
+
   .filter-group select {
     padding: 0.5rem;
     border: 1px solid #dfe6e9;
     border-radius: 0.25rem;
     background-color: white;
   }
-  
+
   .reset-filters {
     display: flex;
     align-items: center;
@@ -493,11 +493,11 @@
     transition: background-color 0.2s;
     margin-left: auto;
   }
-  
+
   .reset-filters:hover {
     background-color: #ecf0f1;
   }
-  
+
   /* Items Section */
   .section-header {
     display: flex;
@@ -505,24 +505,24 @@
     align-items: center;
     margin-bottom: 1rem;
   }
-  
+
   .section-header h2 {
     margin: 0;
     color: #2c3e50;
     font-size: 1.25rem;
   }
-  
+
   .header-actions {
     display: flex;
     align-items: center;
     gap: 1rem;
   }
-  
+
   .item-count {
     color: #7f8c8d;
     font-size: 0.875rem;
   }
-  
+
   .add-item-btn {
     display: flex;
     align-items: center;
@@ -534,53 +534,53 @@
     text-decoration: none;
     transition: background-color 0.2s;
   }
-  
+
   .add-item-btn:hover {
     background-color: #c47520;
     text-decoration: none;
   }
-  
+
   .table-container {
     background-color: white;
     border-radius: 0.5rem;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     overflow: hidden;
   }
-  
+
   .items-table {
     width: 100%;
     border-collapse: collapse;
   }
-  
+
   .items-table th,
   .items-table td {
     padding: 0.75rem 1rem;
     text-align: left;
     border-bottom: 1px solid #ecf0f1;
   }
-  
+
   .items-table th {
     background-color: #f8f9fa;
     font-weight: 600;
     color: #2c3e50;
     font-size: 0.875rem;
   }
-  
+
   .items-table tr:last-child td {
     border-bottom: none;
   }
-  
+
   .items-table tr:hover td {
     background-color: #f8f9fa;
   }
-  
+
   .item-title {
     max-width: 200px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
+
   .badge {
     display: inline-block;
     padding: 0.25rem 0.5rem;
@@ -589,27 +589,27 @@
     border-radius: 9999px;
     text-transform: capitalize;
   }
-  
+
   .badge-lost {
     background-color: #fde8e8;
     color: #e53e3e;
   }
-  
+
   .badge-found {
     background-color: #e6fffa;
     color: #38b2ac;
   }
-  
+
   .badge-claimed {
     background-color: #fef3c7;
     color: #d97706;
   }
-  
+
   .action-buttons {
     display: flex;
     gap: 0.5rem;
   }
-  
+
   .action-btn {
     width: 28px;
     height: 28px;
@@ -621,43 +621,43 @@
     cursor: pointer;
     transition: background-color 0.2s;
   }
-  
+
   .action-btn .material-icons {
     font-size: 18px;
   }
-  
+
   .view-btn {
     background-color: #e3f2fd;
     color: #2196f3;
   }
-  
+
   .view-btn:hover {
     background-color: #bbdefb;
   }
-  
+
   .edit-btn {
     background-color: #e8f5e9;
     color: #4caf50;
   }
-  
+
   .edit-btn:hover {
     background-color: #c8e6c9;
   }
-  
+
   .delete-btn {
     background-color: #ffebee;
     color: #f44336;
   }
-  
+
   .delete-btn:hover {
     background-color: #ffcdd2;
   }
-  
+
   .no-items {
     text-align: center;
     padding: 3rem 1rem !important;
   }
-  
+
   .no-items-message {
     display: flex;
     flex-direction: column;
@@ -665,16 +665,16 @@
     gap: 0.5rem;
     color: #7f8c8d;
   }
-  
+
   .no-items-message .material-icons {
     font-size: 2rem;
     margin-bottom: 0.5rem;
   }
-  
+
   .no-items-message .reset-filters {
     margin-top: 0.5rem;
   }
-  
+
   /* Pagination */
   .pagination {
     display: flex;
@@ -683,7 +683,7 @@
     gap: 0.5rem;
     margin-top: 1.5rem;
   }
-  
+
   .pagination-btn {
     width: 36px;
     height: 36px;
@@ -696,16 +696,16 @@
     cursor: pointer;
     transition: background-color 0.2s;
   }
-  
+
   .pagination-btn:hover:not(:disabled) {
     background-color: #f8f9fa;
   }
-  
+
   .pagination-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
-  
+
   .pagination-info {
     padding: 0 1rem;
     color: #2c3e50;
