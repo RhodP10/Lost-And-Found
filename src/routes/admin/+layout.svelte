@@ -12,7 +12,8 @@
     { path: '/admin/dashboard', label: 'Dashboard', icon: 'dashboard' },
     { path: '/admin/users', label: 'Users', icon: 'people' },
     { path: '/admin/items', label: 'Items', icon: 'inventory_2' },
-    { path: '/admin/categories', label: 'Categories', icon: 'category' }
+    { path: '/admin/categories', label: 'Categories', icon: 'category' },
+    { path: '/admin/claims', label: 'Claims', icon: 'handshake' }
   ];
 
   // Get current path from page data
@@ -31,6 +32,8 @@
       pageTitle = 'Item Management';
     } else if (currentPath.includes('/categories')) {
       pageTitle = 'Category Management';
+    } else if (currentPath.includes('/claims')) {
+      pageTitle = 'Claim Management';
     } else {
       pageTitle = 'Admin Dashboard';
     }

@@ -2,12 +2,18 @@
 	import { onMount } from 'svelte';
 	import type { Item } from '$lib/types';
 	import './item-details.css';
+	import ClaimForm from '$lib/components/ClaimForm.svelte';
+	import ClaimSuccess from '$lib/components/ClaimSuccess.svelte';
 
 	let item: Item | null = null;
 	let isLoading = true;
 	let error = '';
 	let showContactInfo = false;
 	let showImageModal = false;
+	let showClaimForm = false;
+	let isSubmittingClaim = false;
+	let claimSubmitted = false;
+	let claimError = '';
 
 	onMount(async () => {
 		try {
@@ -65,6 +71,62 @@
 		if (event.key === 'Escape' && showImageModal) {
 			closeImageModal();
 		}
+	}
+
+	// Open claim form
+	function openClaimForm() {
+		console.log('Opening claim form');
+		showClaimForm = true;
+	}
+
+	// Close claim form
+	function closeClaimForm() {
+		showClaimForm = false;
+	}
+
+	// Handle claim submission
+	async function handleClaimSubmit(event: CustomEvent) {
+		if (!item) return;
+
+		const claimData = event.detail;
+		isSubmittingClaim = true;
+		claimError = '';
+
+		console.log('Submitting claim with data:', claimData);
+
+		try {
+			console.log('Sending POST request to /api/claims');
+			const response = await fetch('/api/claims', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(claimData)
+			});
+
+			console.log('Response status:', response.status);
+			const data = await response.json();
+			console.log('Response data:', data);
+
+			if (response.ok) {
+				console.log('Claim submitted successfully');
+				claimSubmitted = true;
+				showClaimForm = false;
+			} else {
+				console.error('Error from server:', data.error);
+				claimError = data.error || 'Failed to submit claim';
+			}
+		} catch (err) {
+			console.error('Error submitting claim:', err);
+			claimError = 'An error occurred while submitting your claim';
+		} finally {
+			isSubmittingClaim = false;
+		}
+	}
+
+	// Close success message
+	function closeSuccessMessage() {
+		claimSubmitted = false;
 	}
 </script>
 
@@ -232,6 +294,62 @@
 						{/if}
 					</div>
 				</div>
+
+				<!-- Debug info -->
+				<div class="debug-info" style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; border-radius: 5px;">
+					<p><strong>Debug Info:</strong> Item Status: {item.status}</p>
+				</div>
+
+				{#if item.status === 'found'}
+					<div class="item-section">
+						<div class="claim-container">
+							{#if claimSubmitted}
+								<ClaimSuccess {item} on:close={closeSuccessMessage} />
+							{:else if showClaimForm}
+								{#if claimError}
+									<div class="claim-error-message">
+										<span class="material-icons">error</span>
+										<span>{claimError}</span>
+									</div>
+								{/if}
+								<ClaimForm
+									{item}
+									isSubmitting={isSubmittingClaim}
+									on:submit={handleClaimSubmit}
+									on:cancel={closeClaimForm}
+								/>
+							{:else}
+								<div class="claim-card">
+									<div class="claim-icon">
+										<span class="material-icons">handshake</span>
+									</div>
+									<h2 class="claim-title">Is this your item?</h2>
+									<p class="claim-description">
+										If you believe this is your lost item, you can submit a claim.
+										Our team will review your claim and contact you if it's approved.
+									</p>
+									<button class="claim-button" on:click={openClaimForm}>
+										Claim This Item
+									</button>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{:else}
+					<div class="item-section">
+						<div class="claim-container">
+							<div class="claim-card">
+								<div class="claim-icon">
+									<span class="material-icons">info</span>
+								</div>
+								<h2 class="claim-title">Item Cannot Be Claimed</h2>
+								<p class="claim-description">
+									This item has a status of "{item.status}" and cannot be claimed. Only items with "found" status can be claimed.
+								</p>
+							</div>
+						</div>
+					</div>
+				{/if}
 			</div>
 		</div>
 	{/if}
