@@ -114,7 +114,8 @@
 <style>
   .admin-layout {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden; /* Prevent scrolling on the body */
   }
 
   .sidebar {
@@ -123,6 +124,10 @@
     color: white;
     display: flex;
     flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
   }
 
   .sidebar-header {
@@ -247,6 +252,8 @@
     display: flex;
     flex-direction: column;
     background-color: #f5f5f5;
+    height: 100vh;
+    overflow-y: auto;
   }
 
   .header {
@@ -257,6 +264,9 @@
     background-color: white;
     border-bottom: 1px solid #e0e0e0;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 10;
   }
 
   .header h1 {
@@ -283,6 +293,42 @@
   .content {
     flex: 1;
     padding: 2rem;
-    overflow-y: auto;
+    min-height: calc(100vh - 70px); /* Subtract header height */
+  }
+
+  /* Custom scrollbar for sidebar */
+  .sidebar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .sidebar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  .sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+  }
+
+  .sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  /* Custom scrollbar for main content */
+  .main-content::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .main-content::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  .main-content::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+  }
+
+  .main-content::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
   }
 </style>
