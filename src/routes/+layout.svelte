@@ -193,6 +193,7 @@
 						>
 							Report Lost
 						</a>
+
 						{#if user}
 							<!-- Show user info and dashboard link when logged in -->
 							<div style="display: flex; align-items: center;">

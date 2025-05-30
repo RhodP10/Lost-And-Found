@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { Item } from '$lib/types';
-	import './recent-items.css';
+	import RecentItemsSection from '$lib/components/RecentItemsSection.svelte';
+	import HowItWorks from '$lib/components/HowItWorks.svelte';
 
 	let recentItems: Item[] = [];
 	let isLoading = true;
@@ -40,115 +41,9 @@
 		</div>
 	</section>
 
-	<section class="recent-items-section mb-5">
-		<div class="section-header">
-			<h2 class="section-title">Recent Items</h2>
-			<div class="section-line"></div>
-		</div>
+	<div class="container">
+		<RecentItemsSection items={recentItems} {isLoading} {error} />
+	</div>
 
-		{#if isLoading}
-			<div class="loading-container">
-				<div class="loading-spinner"></div>
-				<p>Loading recent items...</p>
-			</div>
-		{:else if error}
-			<div class="error-container">
-				<div class="error-icon">
-					<span class="material-icons">error</span>
-				</div>
-				<p>{error}</p>
-			</div>
-		{:else if recentItems.length === 0}
-			<div class="empty-container">
-				<div class="empty-icon">
-					<span class="material-icons">inventory_2</span>
-				</div>
-				<p>No items have been reported yet.</p>
-			</div>
-		{:else}
-			<div class="items-grid">
-				{#each recentItems as item}
-					<div class="item-card">
-						<div class="item-status-ribbon {item.status === 'lost' ? 'lost' : 'found'}">
-							{item.status === 'lost' ? 'Lost' : 'Found'}
-						</div>
-						<div class="item-image-container">
-							{#if item.image_url}
-								<img
-									src={item.image_url}
-									alt={item.title}
-									class="item-image"
-								/>
-							{:else}
-								<div class="item-image-placeholder">
-									<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-										<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-										<circle cx="8.5" cy="8.5" r="1.5"></circle>
-										<polyline points="21 15 16 10 5 21"></polyline>
-									</svg>
-								</div>
-							{/if}
-						</div>
-						<div class="item-content">
-							<h3 class="item-title">{item.title}</h3>
-							<div class="item-details">
-								<div class="item-detail">
-									<span class="detail-label">Category:</span>
-									<span class="detail-value">{item.category}</span>
-								</div>
-								{#if item.location}
-									<div class="item-detail">
-										<span class="detail-label">Location:</span>
-										<span class="detail-value">{item.location}</span>
-									</div>
-								{/if}
-								{#if item.floor}
-									<div class="item-detail">
-										<span class="detail-label">Floor:</span>
-										<span class="detail-value">{item.floor}</span>
-									</div>
-								{/if}
-								{#if item.room_number}
-									<div class="item-detail">
-										<span class="detail-label">Room:</span>
-										<span class="detail-value">{item.room_number}</span>
-									</div>
-								{/if}
-								<div class="item-detail">
-									<span class="detail-label">Reported:</span>
-									<span class="detail-value">{new Date(item.date_reported || '').toLocaleDateString()}</span>
-								</div>
-							</div>
-						</div>
-						<div class="item-footer">
-							<a href="/items/{item.id}" class="view-details-btn">
-								View Details <span class="material-icons">arrow_forward</span>
-							</a>
-						</div>
-					</div>
-				{/each}
-			</div>
-		{/if}
-	</section>
-
-	<section class="section-highlight p-4 text-center mb-4">
-		<h2 class="mb-3 accent-text">How It Works</h2>
-		<div class="grid grid-cols-1 grid-cols-md-3 gap-4">
-			<div class="card p-3">
-				<div style="color: var(--color-accent); font-size: 1.5rem; font-weight: bold;" class="mb-2">1</div>
-				<h3 class="mb-2">Report an Item</h3>
-				<p>Report a lost or found item with details and optional photo.</p>
-			</div>
-			<div class="card p-3">
-				<div style="color: var(--color-accent); font-size: 1.5rem; font-weight: bold;" class="mb-2">2</div>
-				<h3 class="mb-2">Browse Listings</h3>
-				<p>Search through lost and found items to find a match.</p>
-			</div>
-			<div class="card p-3">
-				<div style="color: var(--color-accent); font-size: 1.5rem; font-weight: bold;" class="mb-2">3</div>
-				<h3 class="mb-2">Get Connected</h3>
-				<p>Contact the reporter to arrange return of the item.</p>
-			</div>
-		</div>
-	</section>
+	<HowItWorks />
 </div>
