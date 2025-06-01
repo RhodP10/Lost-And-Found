@@ -773,8 +773,7 @@
   }
 
   .field-input.error,
-  .field-select.error,
-  .field-textarea.error {
+  .field-select.error {
     border-color: #e53e3e;
   }
 
